@@ -1,15 +1,17 @@
 
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Minus, Plus, Trash2, Home, ArrowRight, ShoppingCart as CartIcon } from 'lucide-react';
+import { Minus, Plus, Trash2, Home, ArrowRight, ShoppingCart as CartIcon, Check } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
+import { toast } from 'sonner';
 
 const Cart = () => {
   const { cart, removeFromCart, updateQuantity, clearCart, getCartTotal } = useCart();
+  const navigate = useNavigate();
   
   const handleIncrement = (id: number, currentQuantity: number) => {
     updateQuantity(id, currentQuantity + 1);
@@ -21,6 +23,19 @@ const Cart = () => {
     } else {
       removeFromCart(id);
     }
+  };
+
+  const handleFinishOrder = () => {
+    // In a real app, this would submit the order to a backend
+    toast.success('Pedido finalizado com sucesso!', {
+      description: `Total: R$ ${orderTotal.toFixed(2)}`,
+      icon: <Check className="h-4 w-4 text-green-500" />,
+      duration: 5000
+    });
+    clearCart();
+    setTimeout(() => {
+      navigate('/');
+    }, 2000);
   };
 
   const deliveryFee = 8.90;
@@ -141,7 +156,11 @@ const Cart = () => {
                       </div>
                     </div>
                     
-                    <Button className="w-full bg-pizza-500 hover:bg-pizza-600 py-6">
+                    <Button 
+                      className="w-full bg-pizza-500 hover:bg-pizza-600 py-6"
+                      onClick={handleFinishOrder}
+                      disabled={cart.length === 0}
+                    >
                       Finalizar Pedido
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
