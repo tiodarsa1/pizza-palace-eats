@@ -1,17 +1,19 @@
-
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Minus, Plus, Trash2, Home, ArrowRight, ShoppingCart as CartIcon, Check } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { toast } from 'sonner';
+import DeliveryForm from '@/components/cart/DeliveryForm';
 
 const Cart = () => {
   const { cart, removeFromCart, updateQuantity, clearCart, getCartTotal } = useCart();
   const navigate = useNavigate();
+  const [isDeliveryDialogOpen, setIsDeliveryDialogOpen] = React.useState(false);
   
   const handleIncrement = (id: number, currentQuantity: number) => {
     updateQuantity(id, currentQuantity + 1);
@@ -25,13 +27,13 @@ const Cart = () => {
     }
   };
 
-  const handleFinishOrder = () => {
-    // In a real app, this would submit the order to a backend
+  const handleDeliverySubmit = (data: any) => {
     toast.success('Pedido finalizado com sucesso!', {
-      description: `Total: R$ ${orderTotal.toFixed(2)}`,
+      description: `Total: R$ ${orderTotal.toFixed(2)} - Entrega para ${data.street}, ${data.number}`,
       icon: <Check className="h-4 w-4 text-green-500" />,
       duration: 5000
     });
+    setIsDeliveryDialogOpen(false);
     clearCart();
     setTimeout(() => {
       navigate('/');
@@ -58,7 +60,6 @@ const Cart = () => {
           
           {cart.length > 0 ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Cart Items */}
               <div className="lg:col-span-2">
                 <Card>
                   <CardContent className="p-6">
@@ -134,7 +135,6 @@ const Cart = () => {
                 </Card>
               </div>
               
-              {/* Order Summary */}
               <div>
                 <Card>
                   <CardContent className="p-6">
@@ -158,7 +158,7 @@ const Cart = () => {
                     
                     <Button 
                       className="w-full bg-pizza-500 hover:bg-pizza-600 py-6"
-                      onClick={handleFinishOrder}
+                      onClick={() => setIsDeliveryDialogOpen(true)}
                       disabled={cart.length === 0}
                     >
                       Finalizar Pedido
@@ -198,6 +198,15 @@ const Cart = () => {
           )}
         </div>
       </div>
+      
+      <Dialog open={isDeliveryDialogOpen} onOpenChange={setIsDeliveryDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Informações de Entrega</DialogTitle>
+          </DialogHeader>
+          <DeliveryForm onSubmit={handleDeliverySubmit} />
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 };
