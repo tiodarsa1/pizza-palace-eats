@@ -1,212 +1,181 @@
-import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import Layout from '@/components/layout/Layout';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Minus, Plus, Trash2, Home, ArrowRight, ShoppingCart as CartIcon, Check } from 'lucide-react';
-import { useCart } from '@/context/CartContext';
+
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { 
+  Trash, 
+  ShoppingBag, 
+  ChevronUp, 
+  ChevronDown, 
+  ArrowLeft,
+  LogIn
+} from 'lucide-react';
+import Layout from '@/components/layout/Layout';
+import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
+import { useOrders, DeliveryInfo } from '@/context/OrderContext';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import DeliveryForm from '@/components/cart/DeliveryForm';
+import AuthDialog from '@/components/auth/AuthDialog';
 
 const Cart = () => {
   const { cart, removeFromCart, updateQuantity, clearCart, getCartTotal } = useCart();
+  const { isAuthenticated } = useAuth();
+  const { createOrder } = useOrders();
   const navigate = useNavigate();
-  const [isDeliveryDialogOpen, setIsDeliveryDialogOpen] = React.useState(false);
-  
-  const handleIncrement = (id: number, currentQuantity: number) => {
-    updateQuantity(id, currentQuantity + 1);
-  };
-  
-  const handleDecrement = (id: number, currentQuantity: number) => {
-    if (currentQuantity > 1) {
-      updateQuantity(id, currentQuantity - 1);
-    } else {
-      removeFromCart(id);
+
+  const [isDeliveryDialogOpen, setIsDeliveryDialogOpen] = useState(false);
+  const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
+
+  const handleDeliverySubmit = async (data: DeliveryInfo) => {
+    try {
+      const orderId = await createOrder(cart, data, getCartTotal());
+      setIsDeliveryDialogOpen(false);
+      toast.success('Pedido realizado com sucesso!');
+      clearCart();
+      navigate('/orders');
+    } catch (error) {
+      toast.error('Erro ao finalizar pedido. Tente novamente.');
     }
   };
 
-  const handleDeliverySubmit = (data: any) => {
-    toast.success('Pedido finalizado com sucesso!', {
-      description: `Total: R$ ${orderTotal.toFixed(2)} - Entrega para ${data.street}, ${data.number}`,
-      icon: <Check className="h-4 w-4 text-green-500" />,
-      duration: 5000
-    });
-    setIsDeliveryDialogOpen(false);
-    clearCart();
-    setTimeout(() => {
-      navigate('/');
-    }, 2000);
+  const handleCheckout = () => {
+    if (cart.length === 0) {
+      toast.error('Seu carrinho está vazio');
+      return;
+    }
+
+    if (!isAuthenticated) {
+      setIsAuthDialogOpen(true);
+    } else {
+      setIsDeliveryDialogOpen(true);
+    }
   };
 
-  const deliveryFee = 8.90;
-  const cartTotal = getCartTotal();
-  const orderTotal = cartTotal + deliveryFee;
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(price);
+  };
+
+  const handleAuthSuccess = () => {
+    setIsDeliveryDialogOpen(true);
+  };
 
   return (
     <Layout>
-      <div className="bg-gray-50 py-6">
-        <div className="container mx-auto px-4">
-          <div className="mb-6">
-            <h1 className="text-2xl md:text-3xl font-bold">Seu Carrinho</h1>
-            <div className="flex items-center text-sm text-gray-500 mt-1">
-              <Home className="h-3 w-3 mr-1" />
-              <span>Início</span>
-              <span className="mx-2">/</span>
-              <span className="text-pizza-500">Carrinho</span>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center mb-6">
+          <Button variant="ghost" onClick={() => navigate(-1)} className="mr-2">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-3xl font-bold">Seu Carrinho</h1>
+        </div>
+
+        {cart.length === 0 ? (
+          <div className="text-center py-12">
+            <ShoppingBag className="mx-auto h-16 w-16 text-gray-300 mb-4" />
+            <h2 className="text-2xl font-semibold mb-2">Seu carrinho está vazio</h2>
+            <p className="text-gray-500 mb-6">Adicione itens ao carrinho para fazer um pedido</p>
+            <Button onClick={() => navigate('/menu')}>
+              Ver Cardápio
+            </Button>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="md:col-span-2 space-y-4">
+              {cart.map((item) => (
+                <div key={item.id} className="flex border rounded-lg p-4 items-center">
+                  <img
+                    src={item.image}
+                    alt={item.name}
+                    className="w-20 h-20 object-cover rounded-md"
+                  />
+                  <div className="ml-4 flex-grow">
+                    <h3 className="font-semibold">{item.name}</h3>
+                    <p className="text-gray-500 text-sm">{item.description}</p>
+                    <p className="font-bold text-primary mt-1">{formatPrice(item.price)}</p>
+                  </div>
+                  <div className="flex flex-col items-center mr-4">
+                    <button 
+                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                      className="text-gray-500 hover:text-gray-700"
+                    >
+                      <ChevronUp className="h-5 w-5" />
+                    </button>
+                    <span className="my-1 font-medium">{item.quantity}</span>
+                    <button 
+                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                      className="text-gray-500 hover:text-gray-700"
+                      disabled={item.quantity <= 1}
+                    >
+                      <ChevronDown className="h-5 w-5" />
+                    </button>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => removeFromCart(item.id)}
+                    className="text-destructive hover:text-destructive/90"
+                  >
+                    <Trash className="h-5 w-5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            
+            <div className="bg-gray-50 p-6 rounded-lg h-fit">
+              <h2 className="text-xl font-semibold mb-4">Resumo do Pedido</h2>
+              <div className="space-y-3 border-b pb-4 mb-4">
+                {cart.map((item) => (
+                  <div key={item.id} className="flex justify-between">
+                    <span className="text-gray-600">
+                      {item.quantity}x {item.name}
+                    </span>
+                    <span className="font-medium">{formatPrice(item.price * item.quantity)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between text-lg font-bold mb-6">
+                <span>Total</span>
+                <span className="text-primary">{formatPrice(getCartTotal())}</span>
+              </div>
+              <Button className="w-full mb-3" onClick={handleCheckout}>
+                {!isAuthenticated ? (
+                  <>
+                    <LogIn className="mr-2 h-4 w-4" />
+                    Entrar para Finalizar
+                  </>
+                ) : (
+                  'Finalizar Pedido'
+                )}
+              </Button>
+              <Button variant="outline" className="w-full" onClick={() => clearCart()}>
+                Limpar Carrinho
+              </Button>
             </div>
           </div>
-          
-          {cart.length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2">
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-xl font-semibold">Itens do Pedido</h2>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="text-gray-500"
-                        onClick={clearCart}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Limpar
-                      </Button>
-                    </div>
-                    
-                    {cart.map((item) => (
-                      <div key={item.id} className="mb-4">
-                        <div className="flex gap-4">
-                          <div className="w-20 h-20 rounded-md overflow-hidden flex-shrink-0">
-                            <img 
-                              src={item.image} 
-                              alt={item.name} 
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          
-                          <div className="flex-grow">
-                            <div className="flex justify-between">
-                              <h3 className="font-medium">{item.name}</h3>
-                              <span className="font-semibold text-pizza-500">
-                                R$ {(item.price * item.quantity).toFixed(2)}
-                              </span>
-                            </div>
-                            <p className="text-sm text-gray-500 mt-1">{item.description}</p>
-                            
-                            <div className="flex justify-between items-center mt-3">
-                              <div className="flex items-center space-x-1">
-                                <Button 
-                                  variant="outline" 
-                                  size="icon" 
-                                  className="h-8 w-8 rounded-full"
-                                  onClick={() => handleDecrement(item.id, item.quantity)}
-                                >
-                                  <Minus className="h-3 w-3" />
-                                </Button>
-                                <span className="w-8 text-center font-medium">{item.quantity}</span>
-                                <Button 
-                                  variant="outline" 
-                                  size="icon" 
-                                  className="h-8 w-8 rounded-full"
-                                  onClick={() => handleIncrement(item.id, item.quantity)}
-                                >
-                                  <Plus className="h-3 w-3" />
-                                </Button>
-                              </div>
-                              
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-8 text-gray-500"
-                                onClick={() => removeFromCart(item.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                        <Separator className="my-4" />
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              </div>
-              
-              <div>
-                <Card>
-                  <CardContent className="p-6">
-                    <h2 className="text-xl font-semibold mb-6">Resumo do Pedido</h2>
-                    
-                    <div className="space-y-4 mb-6">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Subtotal</span>
-                        <span>R$ {cartTotal.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Taxa de entrega</span>
-                        <span>R$ {deliveryFee.toFixed(2)}</span>
-                      </div>
-                      <Separator />
-                      <div className="flex justify-between font-semibold text-lg">
-                        <span>Total</span>
-                        <span className="text-pizza-500">R$ {orderTotal.toFixed(2)}</span>
-                      </div>
-                    </div>
-                    
-                    <Button 
-                      className="w-full bg-pizza-500 hover:bg-pizza-600 py-6"
-                      onClick={() => setIsDeliveryDialogOpen(true)}
-                      disabled={cart.length === 0}
-                    >
-                      Finalizar Pedido
-                      <ArrowRight className="ml-2 h-5 w-5" />
-                    </Button>
-                    
-                    <Link to="/menu">
-                      <Button variant="outline" className="w-full mt-4">
-                        <CartIcon className="mr-2 h-4 w-4" />
-                        Continuar comprando
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-                
-                <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <h3 className="font-medium text-yellow-800 mb-2">Informações de Entrega</h3>
-                  <p className="text-sm text-yellow-700">
-                    Entrega estimada em 30-45 minutos após a confirmação do pedido. Área de entrega limitada a 5km.
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-16">
-              <div className="text-gray-400 mb-4">
-                <CartIcon className="h-16 w-16 mx-auto" />
-              </div>
-              <h2 className="text-2xl font-medium mb-2">Seu carrinho está vazio</h2>
-              <p className="text-gray-500 mb-6">Adicione itens deliciosos para começar seu pedido</p>
-              <Link to="/menu">
-                <Button className="bg-pizza-500 hover:bg-pizza-600">
-                  Ver Cardápio
-                </Button>
-              </Link>
-            </div>
-          )}
-        </div>
+        )}
       </div>
-      
+
+      {/* Delivery Dialog */}
       <Dialog open={isDeliveryDialogOpen} onOpenChange={setIsDeliveryDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Informações de Entrega</DialogTitle>
           </DialogHeader>
           <DeliveryForm onSubmit={handleDeliverySubmit} />
         </DialogContent>
       </Dialog>
+
+      {/* Auth Dialog */}
+      <AuthDialog 
+        open={isAuthDialogOpen} 
+        onOpenChange={setIsAuthDialogOpen} 
+        onAuthSuccess={handleAuthSuccess}
+      />
     </Layout>
   );
 };

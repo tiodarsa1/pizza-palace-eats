@@ -1,17 +1,42 @@
 
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Home, Pizza, ShoppingCart, User, MapPin, Menu, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Home, Pizza, ShoppingCart, User, MapPin, Menu as MenuIcon, X, LogOut, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
+import AuthDialog from '@/components/auth/AuthDialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const Navbar = () => {
   const isMobile = useIsMobile();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
+  const { getCartCount } = useCart();
+  const { user, isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
+  
   const [cartCount, setCartCount] = useState(0);
+  
+  // Update cart count whenever cart changes
+  useEffect(() => {
+    setCartCount(getCartCount());
+  }, [getCartCount]);
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
   };
 
   return (
@@ -55,17 +80,46 @@ const Navbar = () => {
                   )}
                 </Button>
               </Link>
-              <Link to="/profile">
-                <Button variant="ghost" className="text-gray-700">
+              
+              {isAuthenticated ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                      <User className="h-5 w-5 text-gray-700" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end">
+                    <div className="flex flex-col space-y-1 p-2">
+                      <p className="text-sm font-medium leading-none">
+                        {user?.name}
+                      </p>
+                      <p className="text-xs leading-none text-muted-foreground">
+                        {user?.email}
+                      </p>
+                    </div>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => navigate('/orders')}>
+                      <ClipboardList className="mr-2 h-4 w-4" />
+                      <span>Meus Pedidos</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Sair</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button variant="ghost" className="text-gray-700" onClick={() => setIsAuthDialogOpen(true)}>
                   <User className="h-5 w-5" />
                 </Button>
-              </Link>
+              )}
             </div>
           ) : (
             <>
               {/* Mobile Menu Button */}
               <Button variant="ghost" className="text-gray-700" onClick={toggleMenu}>
-                {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                {isMenuOpen ? <X className="h-6 w-6" /> : <MenuIcon className="h-6 w-6" />}
               </Button>
             </>
           )}
@@ -114,16 +168,45 @@ const Navbar = () => {
                 <span>Carrinho {cartCount > 0 && `(${cartCount})`}</span>
               </div>
             </Link>
-            <Link 
-              to="/profile" 
-              className="block px-4 py-2 text-gray-700 hover:bg-gray-100 hover:text-pizza-500"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              <div className="flex items-center gap-3">
-                <User size={18} />
-                <span>Perfil</span>
-              </div>
-            </Link>
+            {isAuthenticated && (
+              <Link 
+                to="/orders" 
+                className="block px-4 py-2 text-gray-700 hover:bg-gray-100 hover:text-pizza-500"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <div className="flex items-center gap-3">
+                  <ClipboardList size={18} />
+                  <span>Meus Pedidos</span>
+                </div>
+              </Link>
+            )}
+            {isAuthenticated ? (
+              <button 
+                className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 hover:text-pizza-500"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  handleLogout();
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <LogOut size={18} />
+                  <span>Sair ({user?.name})</span>
+                </div>
+              </button>
+            ) : (
+              <button 
+                className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 hover:text-pizza-500"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  setIsAuthDialogOpen(true);
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <User size={18} />
+                  <span>Entrar / Cadastrar</span>
+                </div>
+              </button>
+            )}
             <div className="flex items-center gap-2 px-4 py-2">
               <MapPin className="text-gray-500" size={18} />
               <span className="text-sm text-gray-700">Entrega para: Centro</span>
@@ -131,6 +214,12 @@ const Navbar = () => {
           </div>
         )}
       </div>
+      
+      {/* Auth Dialog */}
+      <AuthDialog 
+        open={isAuthDialogOpen} 
+        onOpenChange={setIsAuthDialogOpen}
+      />
     </nav>
   );
 };
