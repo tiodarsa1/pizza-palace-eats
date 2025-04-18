@@ -25,7 +25,7 @@ const CURRENT_USER_KEY = 'pizza-palace-current-user';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Load user from localStorage on initial render
   useEffect(() => {
@@ -34,7 +34,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (savedUser) {
         setUser(JSON.parse(savedUser));
       }
-      setIsLoading(false);
     };
     
     loadUser();
@@ -52,54 +51,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     // Simulate API call delay
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const users = getUsers();
-    const foundUser = Object.values(users).find(
-      (u: any) => u.email === email && u.password === password
-    );
-    
-    if (foundUser) {
-      // Don't include password in the user state
-      const { password, ...userWithoutPassword } = foundUser;
-      setUser(userWithoutPassword as User);
-      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userWithoutPassword));
-      toast.success('Login realizado com sucesso!');
-    } else {
-      toast.error('Email ou senha inválidos');
-      throw new Error('Invalid credentials');
+    try {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const users = getUsers();
+      const foundUser = Object.values(users).find(
+        (u: any) => u.email === email && u.password === password
+      );
+      
+      if (foundUser) {
+        // Don't include password in the user state
+        const { password, ...userWithoutPassword } = foundUser;
+        setUser(userWithoutPassword as User);
+        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userWithoutPassword));
+        toast.success('Login realizado com sucesso!');
+      } else {
+        toast.error('Email ou senha inválidos');
+        throw new Error('Invalid credentials');
+      }
+    } catch (error) {
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   const signup = async (name: string, email: string, password: string) => {
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const users = getUsers();
-    
-    // Check if email already exists
-    if (Object.values(users).some((u: any) => u.email === email)) {
-      toast.error('Este email já está em uso');
+    try {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const users = getUsers();
+      
+      // Check if email already exists
+      if (Object.values(users).some((u: any) => u.email === email)) {
+        toast.error('Este email já está em uso');
+        throw new Error('Email already exists');
+      }
+      
+      const id = `user-${Date.now()}`;
+      const newUser = { id, name, email, password };
+      
+      // Save to "database"
+      users[id] = newUser;
+      saveUsers(users);
+      
+      // Login the user
+      const { password: _, ...userWithoutPassword } = newUser;
+      setUser(userWithoutPassword);
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userWithoutPassword));
+      
+      toast.success('Cadastro realizado com sucesso!');
+    } catch (error) {
+      throw error;
+    } finally {
       setIsLoading(false);
-      throw new Error('Email already exists');
     }
-    
-    const id = `user-${Date.now()}`;
-    const newUser = { id, name, email, password };
-    
-    // Save to "database"
-    users[id] = newUser;
-    saveUsers(users);
-    
-    // Login the user
-    const { password: _, ...userWithoutPassword } = newUser;
-    setUser(userWithoutPassword);
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userWithoutPassword));
-    
-    toast.success('Cadastro realizado com sucesso!');
-    setIsLoading(false);
   };
 
   const logout = () => {

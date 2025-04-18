@@ -94,15 +94,12 @@ const SignupForm = ({ onSuccess }: SignupFormProps) => {
 
         <FormField
           control={form.control}
-          name="password"
+          name="confirmPassword"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Confirmar Senha</FormLabel>
               <FormControl>
-                <Input placeholder="******" type="password" {...field} name="confirmPassword" 
-                  onChange={(e) => form.setValue('confirmPassword', e.target.value)}
-                  onBlur={() => form.trigger('confirmPassword')}
-                />
+                <Input placeholder="******" type="password" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
