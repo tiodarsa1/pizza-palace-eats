@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -52,16 +53,19 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
-				sidebar: {
-					DEFAULT: 'hsl(var(--sidebar-background))',
-					foreground: 'hsl(var(--sidebar-foreground))',
-					primary: 'hsl(var(--sidebar-primary))',
-					'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
-					accent: 'hsl(var(--sidebar-accent))',
-					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
-					border: 'hsl(var(--sidebar-border))',
-					ring: 'hsl(var(--sidebar-ring))'
-				}
+        pizza: {
+          50: "#FFF5F5",
+          100: "#FFE0E0",
+          200: "#FFC2C2",
+          300: "#FF9B9B",
+          400: "#FF7575",
+          500: "#E91E63", // Primary pizza color
+          600: "#D10F5C",
+          700: "#B70A56",
+          800: "#9C084F",
+          900: "#810647",
+          950: "#500229",
+        },
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
@@ -84,11 +88,16 @@ export default {
 					to: {
 						height: '0'
 					}
-				}
+				},
+        'float': {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-5px)' },
+        }
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+        'float': 'float 3s ease-in-out infinite',
 			}
 		}
 	},
