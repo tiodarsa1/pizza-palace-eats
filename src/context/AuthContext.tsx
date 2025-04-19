@@ -133,7 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Login the user
       const { password: _, ...userWithoutPassword } = newUser;
-      setUser(userWithoutPassword);
+      setUser(userWithoutPassword as User);
       localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userWithoutPassword));
       
       toast.success('Cadastro realizado com sucesso!');
