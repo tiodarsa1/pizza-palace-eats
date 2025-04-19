@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Home, Pizza, ShoppingCart, User, MapPin, Menu as MenuIcon, X, LogOut, ClipboardList } from 'lucide-react';
+import { Home, Pizza, ShoppingCart, User, MapPin, Menu as MenuIcon, X, LogOut, ClipboardList, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useCart } from '@/context/CartContext';
@@ -35,6 +35,11 @@ const Navbar = () => {
   const handleLogout = () => {
     logout();
     navigate('/');
+  };
+
+  const isAdmin = () => {
+    // Implement logic to determine if user is an admin
+    return user?.role === 'admin';
   };
 
   return (
@@ -93,10 +98,12 @@ const Navbar = () => {
                       </p>
                     </div>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => navigate('/orders')}>
-                      <ClipboardList className="mr-2 h-4 w-4" />
-                      <span>Meus Pedidos</span>
-                    </DropdownMenuItem>
+                    {isAdmin() && (
+                      <DropdownMenuItem onClick={() => navigate('/admin')}>
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                        <span>Painel Administrativo</span>
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout}>
                       <LogOut className="mr-2 h-4 w-4" />
