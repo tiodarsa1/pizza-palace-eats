@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Home, Pizza, ShoppingCart, User, MapPin, Menu as MenuIcon, X, LogOut, ClipboardList } from 'lucide-react';
@@ -25,7 +24,6 @@ const Navbar = () => {
   
   const [cartCount, setCartCount] = useState(0);
   
-  // Update cart count whenever cart changes
   useEffect(() => {
     setCartCount(getCartCount());
   }, [getCartCount]);
@@ -43,13 +41,11 @@ const Navbar = () => {
     <nav className="bg-white shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-4 py-3">
         <div className="flex justify-between items-center">
-          {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
             <Pizza className="h-8 w-8 text-pizza-500" />
             <span className="text-xl font-bold text-pizza-500">PizzaPalace</span>
           </Link>
 
-          {/* Delivery Location - Hidden on Mobile */}
           {!isMobile && (
             <div className="flex items-center gap-2">
               <MapPin className="text-gray-500" size={18} />
@@ -57,7 +53,6 @@ const Navbar = () => {
             </div>
           )}
 
-          {/* Desktop Navigation */}
           {!isMobile ? (
             <div className="flex items-center gap-4">
               <Link to="/" className="text-gray-700 hover:text-pizza-500 transition-colors">
@@ -117,7 +112,6 @@ const Navbar = () => {
             </div>
           ) : (
             <>
-              {/* Mobile Menu Button */}
               <Button variant="ghost" className="text-gray-700" onClick={toggleMenu}>
                 {isMenuOpen ? <X className="h-6 w-6" /> : <MenuIcon className="h-6 w-6" />}
               </Button>
@@ -125,7 +119,6 @@ const Navbar = () => {
           )}
         </div>
 
-        {/* Mobile Menu Dropdown */}
         {isMobile && isMenuOpen && (
           <div className="mt-3 space-y-2 py-2 border-t">
             <Link 
@@ -215,7 +208,6 @@ const Navbar = () => {
         )}
       </div>
       
-      {/* Auth Dialog */}
       <AuthDialog 
         open={isAuthDialogOpen} 
         onOpenChange={setIsAuthDialogOpen}

@@ -4,11 +4,12 @@ import { useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Star, Search, Filter, Home } from 'lucide-react';
+import { Plus, Star, Search, Filter, Home, Image, ImageOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { pizzaData, beverageData, PizzaItem } from '@/data/pizzaData';
 import { useCart } from '@/context/CartContext';
+import PizzaDetailsDialog from '@/components/menu/PizzaDetailsDialog';
 
 const Menu = () => {
   const location = useLocation();
@@ -16,6 +17,8 @@ const Menu = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const [filteredItems, setFilteredItems] = useState<PizzaItem[]>([]);
+  const [selectedItem, setSelectedItem] = useState<PizzaItem | null>(null);
+  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
 
   // Get category from URL query parameters
   useEffect(() => {
@@ -51,6 +54,10 @@ const Menu = () => {
 
   const handleCategoryChange = (category: string) => {
     setActiveCategory(category);
+  };
+
+  const handleImageError = (itemId: number) => {
+    setImageErrors(prev => ({ ...prev, [itemId]: true }));
   };
 
   return (
@@ -124,13 +131,24 @@ const Menu = () => {
               {filteredItems.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {filteredItems.map((item) => (
-                    <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                    <Card 
+                      key={item.id} 
+                      className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                      onClick={() => setSelectedItem(item)}
+                    >
                       <div className="relative h-48 overflow-hidden">
-                        <img 
-                          src={item.image} 
-                          alt={item.name} 
-                          className="w-full h-full object-cover"
-                        />
+                        {imageErrors[item.id] ? (
+                          <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                            <ImageOff className="h-12 w-12 text-gray-400" />
+                          </div>
+                        ) : (
+                          <img 
+                            src={item.image} 
+                            alt={item.name} 
+                            className="w-full h-full object-cover"
+                            onError={() => handleImageError(item.id)}
+                          />
+                        )}
                         <div className="absolute top-2 right-2 flex items-center space-x-1 bg-white px-2 py-1 rounded-full shadow text-sm">
                           <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
                           <span className="font-medium">{item.rating}</span>
@@ -144,7 +162,10 @@ const Menu = () => {
                         <div className="flex justify-between items-center">
                           <span className="text-pizza-500 font-bold">R$ {item.price.toFixed(2)}</span>
                           <Button 
-                            onClick={() => addToCart(item)} 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addToCart(item);
+                            }} 
                             size="sm" 
                             className="bg-pizza-500 hover:bg-pizza-600 text-white rounded-full"
                           >
@@ -168,6 +189,12 @@ const Menu = () => {
           </Tabs>
         </div>
       </div>
+
+      <PizzaDetailsDialog
+        pizza={selectedItem}
+        isOpen={!!selectedItem}
+        onClose={() => setSelectedItem(null)}
+      />
     </Layout>
   );
 };
