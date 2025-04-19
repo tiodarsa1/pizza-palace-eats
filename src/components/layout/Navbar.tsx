@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Home, Pizza, ShoppingCart, User, MapPin, Menu as MenuIcon, X, LogOut, ClipboardList, LayoutDashboard } from 'lucide-react';
+import { Home, Pizza, ShoppingCart, User, Menu as MenuIcon, X, LogOut, ClipboardList, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useCart } from '@/context/CartContext';
@@ -51,13 +52,6 @@ const Navbar = () => {
             <span className="text-xl font-bold text-pizza-500">PizzaPalace</span>
           </Link>
 
-          {!isMobile && (
-            <div className="flex items-center gap-2">
-              <MapPin className="text-gray-500" size={18} />
-              <span className="text-sm text-gray-700">Entrega para: Centro</span>
-            </div>
-          )}
-
           {!isMobile ? (
             <div className="flex items-center gap-4">
               <Link to="/" className="text-gray-700 hover:text-pizza-500 transition-colors">
@@ -104,6 +98,10 @@ const Navbar = () => {
                         <span>Painel Administrativo</span>
                       </DropdownMenuItem>
                     )}
+                    <DropdownMenuItem onClick={() => navigate('/orders')}>
+                      <ClipboardList className="mr-2 h-4 w-4" />
+                      <span>Meus Pedidos</span>
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout}>
                       <LogOut className="mr-2 h-4 w-4" />
@@ -169,16 +167,30 @@ const Navbar = () => {
               </div>
             </Link>
             {isAuthenticated && (
-              <Link 
-                to="/orders" 
-                className="block px-4 py-2 text-gray-700 hover:bg-gray-100 hover:text-pizza-500"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <div className="flex items-center gap-3">
-                  <ClipboardList size={18} />
-                  <span>Meus Pedidos</span>
-                </div>
-              </Link>
+              <>
+                {isAdmin() && (
+                  <Link 
+                    to="/admin" 
+                    className="block px-4 py-2 text-gray-700 hover:bg-gray-100 hover:text-pizza-500"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <LayoutDashboard size={18} />
+                      <span>Painel Administrativo</span>
+                    </div>
+                  </Link>
+                )}
+                <Link 
+                  to="/orders" 
+                  className="block px-4 py-2 text-gray-700 hover:bg-gray-100 hover:text-pizza-500"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <div className="flex items-center gap-3">
+                    <ClipboardList size={18} />
+                    <span>Meus Pedidos</span>
+                  </div>
+                </Link>
+              </>
             )}
             {isAuthenticated ? (
               <button 
@@ -207,10 +219,6 @@ const Navbar = () => {
                 </div>
               </button>
             )}
-            <div className="flex items-center gap-2 px-4 py-2">
-              <MapPin className="text-gray-500" size={18} />
-              <span className="text-sm text-gray-700">Entrega para: Centro</span>
-            </div>
           </div>
         )}
       </div>

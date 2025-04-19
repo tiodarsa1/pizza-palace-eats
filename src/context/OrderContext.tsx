@@ -12,6 +12,11 @@ export interface DeliveryInfo {
   phone: string;
 }
 
+export interface PaymentInfo {
+  method: 'credit' | 'debit' | 'cash' | 'pix';
+  change?: string;
+}
+
 export type OrderStatus = 'pending' | 'preparing' | 'delivering' | 'completed' | 'cancelled';
 
 export interface Order {
@@ -19,6 +24,7 @@ export interface Order {
   userId: string;
   items: CartItem[];
   delivery: DeliveryInfo;
+  payment: PaymentInfo;
   total: number;
   date: string;
   status: OrderStatus;
@@ -27,7 +33,7 @@ export interface Order {
 
 interface OrderContextType {
   orders: Order[];
-  createOrder: (items: CartItem[], delivery: DeliveryInfo, total: number) => Promise<string>;
+  createOrder: (items: CartItem[], delivery: DeliveryInfo, payment: PaymentInfo, total: number) => Promise<string>;
   getUserOrders: (userId: string) => Order[];
   reorder: (orderId: string) => void;
   updateOrderStatus: (orderId: string, status: OrderStatus) => void;
@@ -72,7 +78,12 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
   }, [orders]);
 
-  const createOrder = async (items: CartItem[], delivery: DeliveryInfo, total: number): Promise<string> => {
+  const createOrder = async (
+    items: CartItem[], 
+    delivery: DeliveryInfo, 
+    payment: PaymentInfo,
+    total: number
+  ): Promise<string> => {
     if (!user) {
       throw new Error('User must be logged in to create an order');
     }
@@ -83,6 +94,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       userId: user.id,
       items: [...items],
       delivery,
+      payment,
       total,
       date: new Date().toISOString(),
       status: 'pending',
@@ -93,8 +105,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setOrders(prevOrders => [...prevOrders, newOrder]);
     
     // Set new orders flag for admin notification
-    setHasNewOrders(true);
     localStorage.setItem(NEW_ORDERS_KEY, 'true');
+    setHasNewOrders(true);
     
     return newOrder.id;
   };

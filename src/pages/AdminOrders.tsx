@@ -41,6 +41,21 @@ const getStatusBadge = (status: OrderStatus) => {
   }
 };
 
+const getPaymentMethodLabel = (method: string) => {
+  switch (method) {
+    case 'credit':
+      return 'Cartão de Crédito';
+    case 'debit':
+      return 'Cartão de Débito';
+    case 'cash':
+      return 'Dinheiro';
+    case 'pix':
+      return 'PIX';
+    default:
+      return method;
+  }
+};
+
 const OrderDetailModal = ({ order, onClose, onUpdateStatus }: { 
   order: Order | null, 
   onClose: () => void,
@@ -92,6 +107,10 @@ const OrderDetailModal = ({ order, onClose, onUpdateStatus }: {
               <p><strong>Data:</strong> {formatDate(order.date)}</p>
               <p><strong>Status:</strong> {getStatusBadge(order.status)}</p>
               <p><strong>Total:</strong> R$ {order.total.toFixed(2)}</p>
+              <p><strong>Pagamento:</strong> {order.payment ? getPaymentMethodLabel(order.payment.method) : 'Não informado'}</p>
+              {order.payment && order.payment.method === 'cash' && order.payment.change && (
+                <p><strong>Troco para:</strong> R$ {order.payment.change}</p>
+              )}
             </div>
           </div>
           
@@ -114,8 +133,8 @@ const OrderDetailModal = ({ order, onClose, onUpdateStatus }: {
                     <TableCell>R$ {item.price.toFixed(2)}</TableCell>
                     <TableCell>{item.quantity}</TableCell>
                     <TableCell>
-                      {item.customizations?.excludedIngredients?.length ? (
-                        <span className="text-sm text-gray-600">
+                      {item.customizations?.excludedIngredients?.length > 0 ? (
+                        <span className="text-sm text-red-600">
                           Sem: {item.customizations.excludedIngredients.join(', ')}
                         </span>
                       ) : (

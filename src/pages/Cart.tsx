@@ -13,10 +13,11 @@ import {
 import Layout from '@/components/layout/Layout';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
-import { useOrders, DeliveryInfo } from '@/context/OrderContext';
+import { useOrders, DeliveryInfo, PaymentInfo } from '@/context/OrderContext';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import DeliveryForm from '@/components/cart/DeliveryForm';
+import PaymentMethodForm, { PaymentFormData } from '@/components/cart/PaymentMethodForm';
 import AuthDialog from '@/components/auth/AuthDialog';
 
 const Cart = () => {
@@ -26,12 +27,31 @@ const Cart = () => {
   const navigate = useNavigate();
 
   const [isDeliveryDialogOpen, setIsDeliveryDialogOpen] = useState(false);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
+  const [deliveryData, setDeliveryData] = useState<DeliveryInfo | null>(null);
 
-  const handleDeliverySubmit = async (data: DeliveryInfo) => {
+  const handleDeliverySubmit = (data: DeliveryInfo) => {
+    setDeliveryData(data);
+    setIsDeliveryDialogOpen(false);
+    setIsPaymentDialogOpen(true);
+  };
+
+  const handlePaymentSubmit = async (paymentData: PaymentFormData) => {
+    if (!deliveryData) {
+      toast.error('Informações de entrega não fornecidas');
+      return;
+    }
+
     try {
-      const orderId = await createOrder(cart, data, getCartTotal());
-      setIsDeliveryDialogOpen(false);
+      const orderId = await createOrder(
+        cart, 
+        deliveryData, 
+        paymentData, 
+        getCartTotal()
+      );
+      
+      setIsPaymentDialogOpen(false);
       toast.success('Pedido realizado com sucesso!');
       clearCart();
       navigate('/orders');
@@ -96,6 +116,11 @@ const Cart = () => {
                   <div className="ml-4 flex-grow">
                     <h3 className="font-semibold">{item.name}</h3>
                     <p className="text-gray-500 text-sm">{item.description}</p>
+                    {item.customizations?.excludedIngredients?.length > 0 && (
+                      <p className="text-red-500 text-xs mt-1">
+                        Sem: {item.customizations.excludedIngredients.join(', ')}
+                      </p>
+                    )}
                     <p className="font-bold text-primary mt-1">{formatPrice(item.price)}</p>
                   </div>
                   <div className="flex flex-col items-center mr-4">
@@ -167,6 +192,16 @@ const Cart = () => {
             <DialogTitle>Informações de Entrega</DialogTitle>
           </DialogHeader>
           <DeliveryForm onSubmit={handleDeliverySubmit} />
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Method Dialog */}
+      <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Método de Pagamento</DialogTitle>
+          </DialogHeader>
+          <PaymentMethodForm onSubmit={handlePaymentSubmit} />
         </DialogContent>
       </Dialog>
 
