@@ -12,6 +12,7 @@ import Menu from "./pages/Menu";
 import Cart from "./pages/Cart";
 import Promotions from "./pages/Promotions";
 import OrderHistory from "./pages/OrderHistory";
+import AdminOrders from "./pages/AdminOrders";
 import NotFound from "./pages/NotFound";
 import React from "react";
 
@@ -35,6 +36,7 @@ const App = () => {
                     <Route path="/cart" element={<Cart />} />
                     <Route path="/promotions" element={<Promotions />} />
                     <Route path="/orders" element={<OrderHistory />} />
+                    <Route path="/admin" element={<AdminOrders />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </BrowserRouter>

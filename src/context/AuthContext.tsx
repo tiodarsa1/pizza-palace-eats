@@ -6,6 +6,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  role?: 'admin' | 'user';
 }
 
 interface AuthContextType {
@@ -15,6 +16,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
+  isAdmin: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,9 +25,35 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const USERS_STORAGE_KEY = 'pizza-palace-users';
 const CURRENT_USER_KEY = 'pizza-palace-current-user';
 
+// Admin credentials
+const ADMIN_EMAIL = 'tiodarsa27@gmail.com';
+const ADMIN_PASSWORD = 'Trubisco1@';
+const ADMIN_NAME = 'Administrador';
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Initialize admin user if not exists
+  useEffect(() => {
+    const users = getUsers();
+    const adminExists = Object.values(users).some(
+      (u: any) => u.email === ADMIN_EMAIL && u.role === 'admin'
+    );
+    
+    if (!adminExists) {
+      const adminId = `user-admin-${Date.now()}`;
+      users[adminId] = {
+        id: adminId,
+        name: ADMIN_NAME,
+        email: ADMIN_EMAIL,
+        password: ADMIN_PASSWORD,
+        role: 'admin'
+      };
+      saveUsers(users);
+      console.log('Admin user created');
+    }
+  }, []);
 
   // Load user from localStorage on initial render
   useEffect(() => {
@@ -39,7 +67,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loadUser();
   }, []);
 
-  const getUsers = (): Record<string, { id: string; name: string; email: string; password: string }> => {
+  const getUsers = (): Record<string, { id: string; name: string; email: string; password: string; role?: 'admin' | 'user' }> => {
     const users = localStorage.getItem(USERS_STORAGE_KEY);
     return users ? JSON.parse(users) : {};
   };
@@ -90,7 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       const id = `user-${Date.now()}`;
-      const newUser = { id, name, email, password };
+      const newUser = { id, name, email, password, role: 'user' };
       
       // Save to "database"
       users[id] = newUser;
@@ -115,6 +143,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     toast.info('Logout realizado');
   };
 
+  const isAdmin = () => {
+    return user?.role === 'admin';
+  };
+
   return (
     <AuthContext.Provider 
       value={{ 
@@ -123,7 +155,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         login, 
         signup,
-        logout
+        logout,
+        isAdmin
       }}
     >
       {children}
