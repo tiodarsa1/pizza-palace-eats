@@ -48,7 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name: ADMIN_NAME,
         email: ADMIN_EMAIL,
         password: ADMIN_PASSWORD,
-        role: 'admin'
+        role: 'admin' as 'admin'  // Explicitly cast to the literal type 'admin'
       };
       saveUsers(users);
       console.log('Admin user created');
@@ -90,8 +90,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (foundUser) {
         // Don't include password in the user state
         const { password, ...userWithoutPassword } = foundUser;
-        setUser(userWithoutPassword as User);
-        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userWithoutPassword));
+        
+        // Ensure the role is correctly typed
+        const typedUser: User = {
+          ...userWithoutPassword,
+          role: userWithoutPassword.role as 'admin' | 'user'
+        };
+        
+        setUser(typedUser);
+        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(typedUser));
         toast.success('Login realizado com sucesso!');
       } else {
         toast.error('Email ou senha inválidos');
@@ -118,7 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       const id = `user-${Date.now()}`;
-      const newUser = { id, name, email, password, role: 'user' };
+      const newUser = { id, name, email, password, role: 'user' as 'user' };  // Explicitly cast as 'user'
       
       // Save to "database"
       users[id] = newUser;
