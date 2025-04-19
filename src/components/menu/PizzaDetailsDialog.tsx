@@ -43,11 +43,13 @@ const PizzaDetailsDialog: React.FC<PizzaDetailsDialogProps> = ({
     .filter(ingredient => ingredient.toLowerCase() !== 'e orégano');
 
   const handleAddToCart = () => {
-    const customizations = excludedIngredients.length > 0 
-      ? { excludedIngredients } 
-      : undefined;
-    
-    addToCart(pizza, customizations);
+    if (excludedIngredients.length > 0) {
+      // Pass the pizza object and the customization object separately
+      addToCart(pizza, 1, { excludedIngredients });
+    } else {
+      // Just pass the pizza and quantity
+      addToCart(pizza);
+    }
     onClose();
   };
 

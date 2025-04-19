@@ -5,11 +5,14 @@ import { PizzaItem, allProducts } from '@/data/pizzaData';
 
 export interface CartItem extends PizzaItem {
   quantity: number;
+  customizations?: {
+    excludedIngredients?: string[];
+  };
 }
 
 interface CartContextType {
   cart: CartItem[];
-  addToCart: (item: PizzaItem, quantity?: number) => void;
+  addToCart: (item: PizzaItem, quantity?: number, customizations?: any) => void;
   removeFromCart: (id: number) => void;
   updateQuantity: (id: number, quantity: number) => void;
   clearCart: () => void;
@@ -31,21 +34,30 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('cart', JSON.stringify(cart));
   }, [cart]);
 
-  const addToCart = (item: PizzaItem, quantity = 1) => {
+  const addToCart = (item: PizzaItem, quantity = 1, customizations?: any) => {
     setCart(prevCart => {
-      // Check if item already exists in cart
-      const existingItemIndex = prevCart.findIndex(cartItem => cartItem.id === item.id);
+      // For items with customizations, we need to check if the same item with the same
+      // customizations already exists
+      const existingItemIndex = prevCart.findIndex(cartItem => {
+        // If we have customizations, we need to check if they match
+        if (customizations && cartItem.id === item.id) {
+          // Convert to JSON to do a deep comparison of the customizations
+          return JSON.stringify(cartItem.customizations) === JSON.stringify(customizations);
+        }
+        // If no customizations, just check the id
+        return !cartItem.customizations && cartItem.id === item.id;
+      });
       
       if (existingItemIndex >= 0) {
-        // Item exists, update quantity
+        // Item exists with the same customizations, update quantity
         const updatedCart = [...prevCart];
         updatedCart[existingItemIndex].quantity += quantity;
         toast.success(`${item.name} atualizado no carrinho!`);
         return updatedCart;
       } else {
-        // Item doesn't exist, add new item
+        // Item doesn't exist or has different customizations, add new item
         toast.success(`${item.name} adicionado ao carrinho!`);
-        return [...prevCart, { ...item, quantity }];
+        return [...prevCart, { ...item, quantity, customizations }];
       }
     });
   };
