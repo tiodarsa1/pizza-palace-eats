@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -57,7 +58,7 @@ const Cart = () => {
       
       setIsPaymentDialogOpen(false);
       toast.success('Pedido realizado com sucesso!');
-      clearCart();
+      clearCart(false); // Pass false to suppress the toast
       navigate('/orders');
     } catch (error) {
       toast.error('Erro ao finalizar pedido. Tente novamente.');
