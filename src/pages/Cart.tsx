@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -30,6 +29,7 @@ const Cart = () => {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
   const [deliveryData, setDeliveryData] = useState<DeliveryInfo | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleDeliverySubmit = (data: DeliveryInfo) => {
     setDeliveryData(data);
@@ -43,11 +43,15 @@ const Cart = () => {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       const orderId = await createOrder(
         cart, 
         deliveryData, 
-        paymentData, 
+        {
+          method: paymentData.method,
+          change: paymentData.change,
+        }, 
         getCartTotal()
       );
       
@@ -57,6 +61,8 @@ const Cart = () => {
       navigate('/orders');
     } catch (error) {
       toast.error('Erro ao finalizar pedido. Tente novamente.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -201,7 +207,7 @@ const Cart = () => {
           <DialogHeader>
             <DialogTitle>Método de Pagamento</DialogTitle>
           </DialogHeader>
-          <PaymentMethodForm onSubmit={handlePaymentSubmit} />
+          <PaymentMethodForm onSubmit={handlePaymentSubmit} isLoading={isSubmitting} />
         </DialogContent>
       </Dialog>
 
