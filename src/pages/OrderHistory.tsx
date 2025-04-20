@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -43,13 +44,13 @@ const OrderHistory = () => {
 
   const getStatusColor = (status: Order['status']) => {
     switch (status) {
-      case 'pending':
+      case 'pendente':
         return 'bg-yellow-100 text-yellow-800';
-      case 'preparing':
+      case 'em preparação':
+        return 'bg-orange-100 text-orange-800';
+      case 'saiu para entrega':
         return 'bg-blue-100 text-blue-800';
-      case 'delivering':
-        return 'bg-purple-100 text-purple-800';
-      case 'completed':
+      case 'entregue':
         return 'bg-green-100 text-green-800';
       case 'cancelled':
         return 'bg-red-100 text-red-800';
@@ -60,13 +61,13 @@ const OrderHistory = () => {
 
   const getStatusText = (status: Order['status']) => {
     switch (status) {
-      case 'pending':
+      case 'pendente':
         return 'Pendente';
-      case 'preparing':
-        return 'Preparando';
-      case 'delivering':
-        return 'Em entrega';
-      case 'completed':
+      case 'em preparação':
+        return 'Em preparação';
+      case 'saiu para entrega':
+        return 'Saiu para entrega';
+      case 'entregue':
         return 'Entregue';
       case 'cancelled':
         return 'Cancelado';
