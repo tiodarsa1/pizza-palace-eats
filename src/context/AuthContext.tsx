@@ -118,8 +118,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       const users = getUsers();
       
-      // Check if email already exists
-      if (Object.values(users).some((u: any) => u.email === email)) {
+      // Improved email check with case insensitivity
+      const emailExists = Object.values(users).some(
+        (u: any) => u.email.toLowerCase() === email.toLowerCase()
+      );
+      
+      if (emailExists) {
         toast.error('Este email já está em uso');
         throw new Error('Email already exists');
       }

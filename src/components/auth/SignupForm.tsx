@@ -41,6 +41,7 @@ const SignupForm = ({ onSuccess }: SignupFormProps) => {
   const onSubmit = async (data: SignupFormData) => {
     try {
       await signup(data.name, data.email, data.password);
+      form.reset(); // Clear form after successful signup
       if (onSuccess) onSuccess();
     } catch (error) {
       // Error is already handled in the signup function
