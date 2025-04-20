@@ -42,40 +42,6 @@ const OrderHistory = () => {
     navigate('/cart');
   };
 
-  const getStatusColor = (status: Order['status']) => {
-    switch (status) {
-      case 'pendente':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'em preparação':
-        return 'bg-orange-100 text-orange-800';
-      case 'saiu para entrega':
-        return 'bg-blue-100 text-blue-800';
-      case 'entregue':
-        return 'bg-green-100 text-green-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusText = (status: Order['status']) => {
-    switch (status) {
-      case 'pendente':
-        return 'Pendente';
-      case 'em preparação':
-        return 'Em preparação';
-      case 'saiu para entrega':
-        return 'Saiu para entrega';
-      case 'entregue':
-        return 'Entregue';
-      case 'cancelled':
-        return 'Cancelado';
-      default:
-        return status;
-    }
-  };
-
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8">
@@ -95,12 +61,7 @@ const OrderHistory = () => {
               <Card key={order.id} className="w-full">
                 <CardHeader>
                   <CardTitle className="flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                      <span>Pedido #{order.id.split('-')[1]}</span>
-                      <span className={`px-3 py-1 rounded-full text-sm ${getStatusColor(order.status)}`}>
-                        {getStatusText(order.status)}
-                      </span>
-                    </div>
+                    <span>Pedido #{order.id.split('-')[1]}</span>
                     <span className="text-sm font-normal text-gray-500">
                       <Clock className="inline mr-1 h-4 w-4" />
                       {formatDate(order.date)}

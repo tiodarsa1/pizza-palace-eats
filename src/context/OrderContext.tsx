@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { CartItem, useCart } from './CartContext';
@@ -16,7 +17,7 @@ export interface PaymentInfo {
   change?: string;
 }
 
-export type OrderStatus = 'pendente' | 'em preparação' | 'saiu para entrega' | 'entregue' | 'cancelled';
+export type OrderStatus = 'pending' | 'preparing' | 'delivering' | 'completed' | 'cancelled';
 
 export interface Order {
   id: string;
@@ -52,6 +53,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const { addToCart, clearCart } = useCart();
   const { user } = useAuth();
 
+  // Load orders from localStorage on initial render
   useEffect(() => {
     const loadOrders = () => {
       const savedOrders = localStorage.getItem(ORDERS_STORAGE_KEY);
@@ -65,11 +67,13 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     
     loadOrders();
     
+    // Set up interval to check for new orders (simulating server polling)
     const interval = setInterval(loadOrders, 30000);
     
     return () => clearInterval(interval);
   }, []);
 
+  // Save orders to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
   }, [orders]);
@@ -84,6 +88,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       throw new Error('User must be logged in to create an order');
     }
 
+    // Create new order
     const newOrder: Order = {
       id: `order-${Date.now()}`,
       userId: user.id,
@@ -92,12 +97,14 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       payment,
       total,
       date: new Date().toISOString(),
-      status: 'pendente',
+      status: 'pending',
       userName: user.name
     };
 
+    // Update orders
     setOrders(prevOrders => [...prevOrders, newOrder]);
     
+    // Set new orders flag for admin notification
     localStorage.setItem(NEW_ORDERS_KEY, 'true');
     setHasNewOrders(true);
     
@@ -109,6 +116,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [orders]);
 
   const getAllOrders = useCallback((): Order[] => {
+    // Sort by date descending (newest first)
     return [...orders].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [orders]);
 
@@ -119,18 +127,19 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       )
     );
     
+    // Get order details for toast notification
     const order = orders.find(o => o.id === orderId);
     if (order) {
       let statusMessage = '';
       
       switch(status) {
-        case 'em preparação':
+        case 'preparing':
           statusMessage = 'está sendo preparado';
           break;
-        case 'saiu para entrega':
+        case 'delivering':
           statusMessage = 'saiu para entrega';
           break;
-        case 'entregue':
+        case 'completed':
           statusMessage = 'foi entregue';
           break;
         case 'cancelled':
@@ -152,8 +161,10 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return;
     }
 
+    // Clear current cart and add items from the order
     clearCart();
     
+    // Add each item to cart
     order.items.forEach(item => {
       addToCart(item, item.quantity, item.customizations);
     });

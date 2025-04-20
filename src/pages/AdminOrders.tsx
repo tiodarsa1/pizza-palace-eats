@@ -26,13 +26,13 @@ const formatDate = (dateString: string) => {
 
 const getStatusBadge = (status: OrderStatus) => {
   switch (status) {
-    case 'pendente':
+    case 'pending':
       return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">Pendente</Badge>;
-    case 'em preparação':
-      return <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">Em preparação</Badge>;
-    case 'saiu para entrega':
-      return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">Saiu para entrega</Badge>;
-    case 'entregue':
+    case 'preparing':
+      return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">Em Preparação</Badge>;
+    case 'delivering':
+      return <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">Em Entrega</Badge>;
+    case 'completed':
       return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">Entregue</Badge>;
     case 'cancelled':
       return <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">Cancelado</Badge>;
