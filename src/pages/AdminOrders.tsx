@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Bell, BellRing, Check, Truck, Package } from 'lucide-react';
+import { Bell, BellRing, Check, Truck, Package, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -179,11 +180,26 @@ const OrderDetailModal = ({ order, onClose, onUpdateStatus }: {
 const AdminOrders = () => {
   const navigate = useNavigate();
   const { isAuthenticated, isAdmin } = useAuth();
-  const { getAllOrders, updateOrderStatus, hasNewOrders, clearNewOrdersFlag } = useOrders();
+  const { getAllOrders, updateOrderStatus, hasNewOrders, clearNewOrdersFlag, refreshOrders } = useOrders();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [filter, setFilter] = useState<OrderStatus | 'all'>('all');
   const [orders, setOrders] = useState<Order[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const isMobile = useIsMobile();
+  
+  // Function to fetch and update orders
+  const updateOrdersList = useCallback(() => {
+    try {
+      console.log('Updating orders list');
+      const allOrders = getAllOrders();
+      console.log('Orders count from getAllOrders:', allOrders.length);
+      setOrders(allOrders);
+      return allOrders.length;
+    } catch (error) {
+      console.error('Error updating orders list:', error);
+      return 0;
+    }
+  }, [getAllOrders]);
   
   useEffect(() => {
     if (!isAuthenticated) {
@@ -202,31 +218,28 @@ const AdminOrders = () => {
       clearNewOrdersFlag();
     }
     
-    const updateOrdersList = () => {
-      console.log('Updating orders list');
-      const allOrders = getAllOrders();
-      console.log('Orders count:', allOrders.length);
-      setOrders(allOrders);
-    };
-    
+    // Initial load
     updateOrdersList();
     
+    // Event listeners for real-time updates
     const handleNewOrder = (event: Event) => {
       const customEvent = event as CustomEvent;
-      console.log('New order received:', customEvent.detail);
-      updateOrdersList();
+      console.log('New order received in admin panel:', customEvent.detail);
+      const count = updateOrdersList();
       
-      toast.success('Novo pedido recebido!');
+      toast.success(`Novo pedido recebido! Total: ${count}`);
       if (isMobile && navigator.vibrate) {
         navigator.vibrate([100, 50, 100]);
       }
     };
     
-    window.addEventListener('new-order-created', handleNewOrder);
-    
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'pizza-palace-orders' || e.key === 'pizza-palace-new-orders') {
-        console.log('Storage changed, updating orders list');
+      console.log('Storage changed in admin panel:', e.key);
+      
+      // Check for direct order updates
+      if (e.key === 'pizza-palace-orders' || e.key === 'pizza-palace-new-orders' || 
+          e.key === 'pizza-palace-last-sync' || e.key === 'pizza-palace-order-broadcast') {
+        console.log('Order-related storage changed, updating orders list');
         updateOrdersList();
         
         if (e.key === 'pizza-palace-new-orders' && e.newValue === 'true') {
@@ -235,24 +248,41 @@ const AdminOrders = () => {
             navigator.vibrate([100, 50, 100]);
           }
         }
+        
+        // Check for broadcast messages
+        if (e.key === 'pizza-palace-order-broadcast' && e.newValue) {
+          try {
+            const broadcast = JSON.parse(e.newValue);
+            if (broadcast.type === 'new-order') {
+              console.log('New order broadcast received in admin panel:', broadcast);
+              updateOrdersList();
+              toast.success(`Novo pedido recebido: #${broadcast.orderId.split('-')[1]}`);
+            }
+          } catch (error) {
+            console.error('Error parsing broadcast data:', error);
+          }
+        }
       }
     };
     
+    window.addEventListener('new-order-created', handleNewOrder);
     window.addEventListener('storage', handleStorageChange);
     
-    const interval = setInterval(updateOrdersList, isMobile ? 2000 : 3000);
+    // Set up polling for orders (shorter interval on mobile for better responsiveness)
+    const pollingInterval = setInterval(updateOrdersList, isMobile ? 1500 : 2500);
     
+    // Force an additional refresh after a short delay to catch any missed updates
     setTimeout(updateOrdersList, 500);
     
     return () => {
       window.removeEventListener('new-order-created', handleNewOrder);
       window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
+      clearInterval(pollingInterval);
     };
-  }, [isAuthenticated, isAdmin, navigate, hasNewOrders, clearNewOrdersFlag, getAllOrders, isMobile]);
+  }, [isAuthenticated, isAdmin, navigate, hasNewOrders, clearNewOrdersFlag, updateOrdersList, isMobile]);
   
   useEffect(() => {
-    console.log('Current orders in admin panel:', orders);
+    console.log('Current orders in admin panel:', orders.length);
   }, [orders]);
   
   const filteredOrders = filter === 'all' 
@@ -270,9 +300,17 @@ const AdminOrders = () => {
   
   const handleManualRefresh = () => {
     console.log('Manual refresh requested');
-    const allOrders = getAllOrders();
-    setOrders(allOrders);
-    toast.info('Lista de pedidos atualizada');
+    setIsRefreshing(true);
+    
+    // First call refreshOrders from context to reload from localStorage
+    refreshOrders();
+    
+    // Then update our local state
+    setTimeout(() => {
+      const count = updateOrdersList();
+      toast.info(`Lista de pedidos atualizada. Total: ${count} pedidos`);
+      setIsRefreshing(false);
+    }, 300);
   };
   
   return (
@@ -296,11 +334,13 @@ const AdminOrders = () => {
               )}
               
               <Button 
-                variant="ghost" 
+                variant="outline" 
                 size="sm" 
                 onClick={handleManualRefresh}
-                className="ml-2"
+                className="flex items-center gap-1"
+                disabled={isRefreshing}
               >
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 Atualizar
               </Button>
             </div>
@@ -353,7 +393,15 @@ const AdminOrders = () => {
               </Button>
             </div>
             
-            {filteredOrders.length === 0 ? (
+            {orders.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-500 mb-4">Nenhum pedido encontrado.</p>
+                <Button onClick={handleManualRefresh} variant="outline" size="sm">
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  Atualizar Pedidos
+                </Button>
+              </div>
+            ) : filteredOrders.length === 0 ? (
               <div className="text-center p-8 text-gray-500">
                 Nenhum pedido encontrado para este filtro.
               </div>

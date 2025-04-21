@@ -58,6 +58,21 @@ const Cart = () => {
       );
       
       console.log('Order created successfully with ID:', orderId);
+      
+      // Additional direct cross-browser sync
+      try {
+        // Force other tabs/browsers to refresh their orders immediately
+        localStorage.setItem('pizza-palace-force-refresh', Date.now().toString());
+        
+        // Create an additional event to trigger refreshes
+        setTimeout(() => {
+          const syncEvent = new CustomEvent('order-sync-required');
+          window.dispatchEvent(syncEvent);
+        }, 500);
+      } catch (error) {
+        console.error('Error sending additional sync events:', error);
+      }
+      
       setIsPaymentDialogOpen(false);
       toast.success('Pedido realizado com sucesso!');
       clearCart(false); // Pass false to suppress the toast

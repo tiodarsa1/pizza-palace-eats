@@ -14,6 +14,7 @@ import Promotions from "./pages/Promotions";
 import OrderHistory from "./pages/OrderHistory";
 import AdminOrders from "./pages/AdminOrders";
 import NotFound from "./pages/NotFound";
+import AdminOrderAlert from "./components/admin/AdminOrderAlert";
 import React from "react";
 
 // Create a client
@@ -39,6 +40,7 @@ const App = () => {
                     <Route path="/admin" element={<AdminOrders />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
+                  <AdminOrderAlert />
                 </BrowserRouter>
               </OrderProvider>
             </CartProvider>
