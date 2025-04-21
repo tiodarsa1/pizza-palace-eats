@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -12,6 +11,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { useOrders, Order, OrderStatus } from '@/context/OrderContext';
 import Layout from '@/components/layout/Layout';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
@@ -183,10 +183,9 @@ const AdminOrders = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [filter, setFilter] = useState<OrderStatus | 'all'>('all');
   const [orders, setOrders] = useState<Order[]>([]);
+  const isMobile = useIsMobile();
   
-  // Load initial orders and set up real-time updates
   useEffect(() => {
-    // Check if user is authenticated and is an admin
     if (!isAuthenticated) {
       toast.error('Você precisa estar logado para acessar esta página');
       navigate('/');
@@ -199,12 +198,10 @@ const AdminOrders = () => {
       return;
     }
     
-    // Clear new orders notification when the admin visits the page
     if (hasNewOrders) {
       clearNewOrdersFlag();
     }
     
-    // Function to update orders list
     const updateOrdersList = () => {
       console.log('Updating orders list');
       const allOrders = getAllOrders();
@@ -212,46 +209,52 @@ const AdminOrders = () => {
       setOrders(allOrders);
     };
     
-    // Initial load of orders
     updateOrdersList();
     
-    // Set up listeners for real-time updates
     const handleNewOrder = (event: Event) => {
       const customEvent = event as CustomEvent;
       console.log('New order received:', customEvent.detail);
       updateOrdersList();
+      
       toast.success('Novo pedido recebido!');
+      if (isMobile && navigator.vibrate) {
+        navigator.vibrate([100, 50, 100]);
+      }
     };
     
-    // Listen for custom event from OrderContext
     window.addEventListener('new-order-created', handleNewOrder);
     
-    // Also set up a storage event listener for cross-tab updates
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'pizza-palace-orders' || e.key === 'pizza-palace-new-orders') {
         console.log('Storage changed, updating orders list');
         updateOrdersList();
+        
+        if (e.key === 'pizza-palace-new-orders' && e.newValue === 'true') {
+          toast.success('Novo pedido recebido!');
+          if (isMobile && navigator.vibrate) {
+            navigator.vibrate([100, 50, 100]);
+          }
+        }
       }
     };
     
     window.addEventListener('storage', handleStorageChange);
     
-    // Set up polling interval as backup
-    const interval = setInterval(updateOrdersList, 5000);
+    const interval = setInterval(updateOrdersList, isMobile ? 2000 : 3000);
+    
+    setTimeout(updateOrdersList, 500);
     
     return () => {
       window.removeEventListener('new-order-created', handleNewOrder);
       window.removeEventListener('storage', handleStorageChange);
       clearInterval(interval);
     };
-  }, [isAuthenticated, isAdmin, navigate, hasNewOrders, clearNewOrdersFlag, getAllOrders]);
+  }, [isAuthenticated, isAdmin, navigate, hasNewOrders, clearNewOrdersFlag, getAllOrders, isMobile]);
   
-  // Debug logging for orders
   useEffect(() => {
     console.log('Current orders in admin panel:', orders);
   }, [orders]);
   
-  // Filter orders when either orders or filter changes
   const filteredOrders = filter === 'all' 
     ? orders 
     : orders.filter(order => order.status === filter);
@@ -260,10 +263,16 @@ const AdminOrders = () => {
     updateOrderStatus(orderId, status);
     setSelectedOrder(prev => prev?.id === orderId ? {...prev, status} : prev);
     
-    // Also update local orders state immediately
     setOrders(prev => 
       prev.map(order => order.id === orderId ? { ...order, status } : order)
     );
+  };
+  
+  const handleManualRefresh = () => {
+    console.log('Manual refresh requested');
+    const allOrders = getAllOrders();
+    setOrders(allOrders);
+    toast.info('Lista de pedidos atualizada');
   };
   
   return (
@@ -278,12 +287,23 @@ const AdminOrders = () => {
               </CardDescription>
             </div>
             
-            {hasNewOrders && (
-              <div className="flex items-center gap-2 bg-red-100 text-red-800 px-3 py-1 rounded-full animate-pulse">
-                <BellRing className="h-4 w-4" />
-                <span className="text-sm font-medium">Novos pedidos!</span>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              {hasNewOrders && (
+                <div className="flex items-center gap-2 bg-red-100 text-red-800 px-3 py-1 rounded-full animate-pulse">
+                  <BellRing className="h-4 w-4" />
+                  <span className="text-sm font-medium">Novos pedidos!</span>
+                </div>
+              )}
+              
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleManualRefresh}
+                className="ml-2"
+              >
+                Atualizar
+              </Button>
+            </div>
           </CardHeader>
           
           <CardContent>

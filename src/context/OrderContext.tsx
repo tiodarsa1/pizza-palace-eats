@@ -67,8 +67,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     
     loadOrders();
     
-    // Set up interval to check for new orders more frequently (every 5 seconds)
-    const interval = setInterval(loadOrders, 5000);
+    // Set up interval to check for new orders more frequently (every 3 seconds)
+    const interval = setInterval(loadOrders, 3000);
     
     // Also set up an event listener for storage changes
     const handleStorageChange = (e: StorageEvent) => {
@@ -123,6 +123,18 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Dispatch a custom event that the admin panel can listen for
     const customEvent = new CustomEvent('new-order-created', { detail: newOrder });
     window.dispatchEvent(customEvent);
+    
+    // Additional browser-sync approach for mobile devices
+    try {
+      // Create a temporary hidden iframe to force a storage event on other tabs/windows
+      const tempKey = `temp-order-sync-${Date.now()}`;
+      localStorage.setItem(tempKey, 'sync-trigger');
+      localStorage.removeItem(tempKey);
+      
+      console.log('Order created and sync event triggered:', newOrder.id);
+    } catch (e) {
+      console.error('Error triggering sync event:', e);
+    }
     
     return newOrder.id;
   };

@@ -4,11 +4,13 @@ import { Link } from 'react-router-dom';
 import { BellRing } from 'lucide-react';
 import { useOrders } from '@/context/OrderContext';
 import { useAuth } from '@/context/AuthContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const AdminOrderAlert: React.FC = () => {
   const { hasNewOrders } = useOrders();
   const { isAdmin } = useAuth();
   const [showNotification, setShowNotification] = useState(false);
+  const isMobile = useIsMobile();
   
   useEffect(() => {
     // Only show notification to admins
@@ -17,7 +19,7 @@ const AdminOrderAlert: React.FC = () => {
       
       // Play notification sound
       const audio = new Audio('/notification.mp3');
-      audio.volume = 0.5; // Set volume to 50%
+      audio.volume = isMobile ? 1.0 : 0.5; // Higher volume on mobile
       audio.play().catch(e => console.log('Failed to play notification sound:', e));
       
       // Vibrate device if supported
@@ -25,7 +27,7 @@ const AdminOrderAlert: React.FC = () => {
         navigator.vibrate([200, 100, 200]);
       }
     }
-  }, [hasNewOrders, isAdmin]);
+  }, [hasNewOrders, isAdmin, isMobile]);
   
   // Listen for new order events
   useEffect(() => {
@@ -35,7 +37,7 @@ const AdminOrderAlert: React.FC = () => {
         
         // Play notification sound
         const audio = new Audio('/notification.mp3');
-        audio.volume = 0.5;
+        audio.volume = isMobile ? 1.0 : 0.5; // Higher volume on mobile
         audio.play().catch(e => console.log('Failed to play notification sound:', e));
         
         if (navigator.vibrate) {
@@ -46,10 +48,20 @@ const AdminOrderAlert: React.FC = () => {
     
     window.addEventListener('new-order-created', handleNewOrder);
     
+    // Also listen for storage changes for better cross-device/browser sync
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'pizza-palace-new-orders' && e.newValue === 'true') {
+        handleNewOrder();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
     return () => {
       window.removeEventListener('new-order-created', handleNewOrder);
+      window.removeEventListener('storage', handleStorageChange);
     };
-  }, [isAdmin]);
+  }, [isAdmin, isMobile]);
   
   if (!isAdmin() || !showNotification) {
     return null;
