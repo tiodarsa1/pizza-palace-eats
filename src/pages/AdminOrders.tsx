@@ -182,7 +182,9 @@ const AdminOrders = () => {
   const { getAllOrders, updateOrderStatus, hasNewOrders, clearNewOrdersFlag } = useOrders();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [filter, setFilter] = useState<OrderStatus | 'all'>('all');
+  const [orders, setOrders] = useState<Order[]>([]);
   
+  // Load initial orders and set up real-time updates
   useEffect(() => {
     // Check if user is authenticated and is an admin
     if (!isAuthenticated) {
@@ -201,17 +203,55 @@ const AdminOrders = () => {
     if (hasNewOrders) {
       clearNewOrdersFlag();
     }
-  }, [isAuthenticated, isAdmin, navigate, hasNewOrders, clearNewOrdersFlag]);
+    
+    // Initial load of orders
+    setOrders(getAllOrders());
+    
+    // Set up listeners for real-time updates
+    const handleNewOrder = () => {
+      console.log('New order detected, updating orders list');
+      setOrders(getAllOrders());
+      toast.success('Novo pedido recebido!');
+    };
+    
+    // Listen for custom event from OrderContext
+    window.addEventListener('new-order-created', handleNewOrder);
+    
+    // Also set up a storage event listener for cross-tab updates
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'pizza-palace-orders' || e.key === 'pizza-palace-new-orders') {
+        console.log('Storage changed, updating orders list');
+        setOrders(getAllOrders());
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Set up polling interval as backup
+    const interval = setInterval(() => {
+      setOrders(getAllOrders());
+    }, 5000);
+    
+    return () => {
+      window.removeEventListener('new-order-created', handleNewOrder);
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [isAuthenticated, isAdmin, navigate, hasNewOrders, clearNewOrdersFlag, getAllOrders]);
   
-  const allOrders = getAllOrders();
-  
+  // Filter orders when either orders or filter changes
   const filteredOrders = filter === 'all' 
-    ? allOrders 
-    : allOrders.filter(order => order.status === filter);
+    ? orders 
+    : orders.filter(order => order.status === filter);
   
   const handleUpdateStatus = (orderId: string, status: OrderStatus) => {
     updateOrderStatus(orderId, status);
     setSelectedOrder(prev => prev?.id === orderId ? {...prev, status} : prev);
+    
+    // Also update local orders state immediately
+    setOrders(prev => 
+      prev.map(order => order.id === orderId ? { ...order, status } : order)
+    );
   };
   
   return (

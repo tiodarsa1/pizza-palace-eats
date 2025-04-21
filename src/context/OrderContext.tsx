@@ -67,10 +67,22 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     
     loadOrders();
     
-    // Set up interval to check for new orders (simulating server polling)
-    const interval = setInterval(loadOrders, 30000);
+    // Set up interval to check for new orders more frequently (every 5 seconds)
+    const interval = setInterval(loadOrders, 5000);
     
-    return () => clearInterval(interval);
+    // Also set up an event listener for storage changes
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === ORDERS_STORAGE_KEY || e.key === NEW_ORDERS_KEY) {
+        loadOrders();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   // Save orders to localStorage whenever it changes
@@ -104,9 +116,13 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Update orders
     setOrders(prevOrders => [...prevOrders, newOrder]);
     
-    // Set new orders flag for admin notification
+    // Set new orders flag for admin notification and dispatch custom event
     localStorage.setItem(NEW_ORDERS_KEY, 'true');
     setHasNewOrders(true);
+    
+    // Dispatch a custom event that the admin panel can listen for
+    const customEvent = new CustomEvent('new-order-created', { detail: newOrder });
+    window.dispatchEvent(customEvent);
     
     return newOrder.id;
   };
