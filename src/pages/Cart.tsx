@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -47,31 +46,85 @@ const Cart = () => {
     setIsSubmitting(true);
     try {
       console.log('Creating order for user:', user);
-      const orderId = await createOrder(
-        cart, 
-        deliveryData, 
-        {
-          method: paymentData.method,
-          change: paymentData.change,
-        }, 
-        getCartTotal()
-      );
       
-      console.log('Order created successfully with ID:', orderId);
-      
-      // Additional direct cross-browser sync
+      // Multiple attempts for reliability
+      let orderId;
       try {
-        // Force other tabs/browsers to refresh their orders immediately
+        // First attempt
+        orderId = await createOrder(
+          cart, 
+          deliveryData, 
+          {
+            method: paymentData.method,
+            change: paymentData.change,
+          }, 
+          getCartTotal()
+        );
+        
+        console.log('Order created successfully with ID:', orderId);
+      } catch (error) {
+        console.error('First attempt failed, retrying order creation:', error);
+        // Second attempt with slight delay
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        orderId = await createOrder(
+          cart, 
+          deliveryData, 
+          {
+            method: paymentData.method,
+            change: paymentData.change,
+          }, 
+          getCartTotal()
+        );
+      }
+      
+      // Additional direct cross-browser sync with multiple methods
+      try {
+        // 1. Force other tabs/browsers to refresh their orders immediately
         localStorage.setItem('pizza-palace-force-refresh', Date.now().toString());
         
-        // Create an additional event to trigger refreshes
-        setTimeout(() => {
-          const syncEvent = new CustomEvent('order-sync-required');
-          window.dispatchEvent(syncEvent);
-        }, 500);
+        // 2. Create additional events to trigger refreshes
+        ['order-sync-required', 'orders-updated', 'new-order-created'].forEach(eventType => {
+          try {
+            const syncEvent = new CustomEvent(eventType, {
+              detail: { timestamp: Date.now(), orderId }
+            });
+            window.dispatchEvent(syncEvent);
+            console.log(`Dispatched ${eventType} event for new order`);
+          } catch (e) {
+            console.error(`Error dispatching ${eventType} event:`, e);
+          }
+        });
+        
+        // 3. Ensure both old and new flag keys are set
+        localStorage.setItem('pizza-palace-new-orders', 'true');
+        localStorage.setItem('pizza-palace-new-orders-v2', 'true');
+        
+        // 4. Ensure both old and new broadcast keys have values
+        const broadcastData = JSON.stringify({
+          type: 'new-order',
+          orderId,
+          timestamp: Date.now(),
+          source: 'cart-completion'
+        });
+        
+        localStorage.setItem('pizza-palace-order-broadcast', broadcastData);
+        localStorage.setItem('pizza-palace-order-broadcast-v2', broadcastData);
+        
+        console.log('Cross-browser synchronization complete');
       } catch (error) {
         console.error('Error sending additional sync events:', error);
       }
+      
+      // Schedule a delayed additional sync for reliability
+      setTimeout(() => {
+        try {
+          localStorage.setItem('pizza-palace-force-refresh', Date.now().toString());
+          console.log('Sent delayed force refresh trigger');
+        } catch (e) {
+          console.error('Error sending delayed force refresh:', e);
+        }
+      }, 1000);
       
       setIsPaymentDialogOpen(false);
       toast.success('Pedido realizado com sucesso!');
