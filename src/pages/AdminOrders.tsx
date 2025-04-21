@@ -204,13 +204,22 @@ const AdminOrders = () => {
       clearNewOrdersFlag();
     }
     
+    // Function to update orders list
+    const updateOrdersList = () => {
+      console.log('Updating orders list');
+      const allOrders = getAllOrders();
+      console.log('Orders count:', allOrders.length);
+      setOrders(allOrders);
+    };
+    
     // Initial load of orders
-    setOrders(getAllOrders());
+    updateOrdersList();
     
     // Set up listeners for real-time updates
-    const handleNewOrder = () => {
-      console.log('New order detected, updating orders list');
-      setOrders(getAllOrders());
+    const handleNewOrder = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      console.log('New order received:', customEvent.detail);
+      updateOrdersList();
       toast.success('Novo pedido recebido!');
     };
     
@@ -221,16 +230,14 @@ const AdminOrders = () => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'pizza-palace-orders' || e.key === 'pizza-palace-new-orders') {
         console.log('Storage changed, updating orders list');
-        setOrders(getAllOrders());
+        updateOrdersList();
       }
     };
     
     window.addEventListener('storage', handleStorageChange);
     
     // Set up polling interval as backup
-    const interval = setInterval(() => {
-      setOrders(getAllOrders());
-    }, 5000);
+    const interval = setInterval(updateOrdersList, 5000);
     
     return () => {
       window.removeEventListener('new-order-created', handleNewOrder);
@@ -238,6 +245,11 @@ const AdminOrders = () => {
       clearInterval(interval);
     };
   }, [isAuthenticated, isAdmin, navigate, hasNewOrders, clearNewOrdersFlag, getAllOrders]);
+  
+  // Debug logging for orders
+  useEffect(() => {
+    console.log('Current orders in admin panel:', orders);
+  }, [orders]);
   
   // Filter orders when either orders or filter changes
   const filteredOrders = filter === 'all' 

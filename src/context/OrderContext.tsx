@@ -110,7 +110,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       total,
       date: new Date().toISOString(),
       status: 'pending',
-      userName: user.name
+      userName: user.name // Ensure user name is always saved to the order
     };
 
     // Update orders

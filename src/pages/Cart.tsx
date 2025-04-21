@@ -22,7 +22,7 @@ import AuthDialog from '@/components/auth/AuthDialog';
 
 const Cart = () => {
   const { cart, removeFromCart, updateQuantity, clearCart, getCartTotal } = useCart();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { createOrder } = useOrders();
   const navigate = useNavigate();
 
@@ -46,6 +46,7 @@ const Cart = () => {
 
     setIsSubmitting(true);
     try {
+      console.log('Creating order for user:', user);
       const orderId = await createOrder(
         cart, 
         deliveryData, 
@@ -56,11 +57,13 @@ const Cart = () => {
         getCartTotal()
       );
       
+      console.log('Order created successfully with ID:', orderId);
       setIsPaymentDialogOpen(false);
       toast.success('Pedido realizado com sucesso!');
       clearCart(false); // Pass false to suppress the toast
       navigate('/orders');
     } catch (error) {
+      console.error('Error creating order:', error);
       toast.error('Erro ao finalizar pedido. Tente novamente.');
     } finally {
       setIsSubmitting(false);

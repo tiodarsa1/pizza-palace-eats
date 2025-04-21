@@ -27,6 +27,30 @@ const AdminOrderAlert: React.FC = () => {
     }
   }, [hasNewOrders, isAdmin]);
   
+  // Listen for new order events
+  useEffect(() => {
+    const handleNewOrder = () => {
+      if (isAdmin()) {
+        setShowNotification(true);
+        
+        // Play notification sound
+        const audio = new Audio('/notification.mp3');
+        audio.volume = 0.5;
+        audio.play().catch(e => console.log('Failed to play notification sound:', e));
+        
+        if (navigator.vibrate) {
+          navigator.vibrate([200, 100, 200]);
+        }
+      }
+    };
+    
+    window.addEventListener('new-order-created', handleNewOrder);
+    
+    return () => {
+      window.removeEventListener('new-order-created', handleNewOrder);
+    };
+  }, [isAdmin]);
+  
   if (!isAdmin() || !showNotification) {
     return null;
   }
