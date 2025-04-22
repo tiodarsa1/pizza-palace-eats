@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { BellRing, RefreshCw } from 'lucide-react';
 import { useOrders } from '@/context/OrderContext';
@@ -18,6 +18,8 @@ const AdminOrderAlert: React.FC = () => {
   const [showNotification, setShowNotification] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const isMobile = useIsMobile();
+  const refreshTimerRef = useRef<number | null>(null);
+  const pollTimerRef = useRef<number | null>(null);
   
   // Helper para som de notificação com throttling
   const playNotificationSound = useCallback(() => {
@@ -41,7 +43,7 @@ const AdminOrderAlert: React.FC = () => {
     }
   }, [isMobile]);
   
-  // Função para lidar com notificações de pedido
+  // Função para lidar com notificações de pedido com debounce
   const handleOrderNotification = useCallback(() => {
     if (isAdmin()) {
       console.log('Alerta de administrador: mostrando notificação');
@@ -58,23 +60,19 @@ const AdminOrderAlert: React.FC = () => {
     }
   }, [hasNewOrders, isAdmin, handleOrderNotification]);
 
-  // Event listeners aprimorados com monitoramento de múltiplas fontes
+  // Event listeners aprimorados com monitoramento otimizado
   useEffect(() => {
+    if (!isAdmin()) return;
+    
     // Manipulador de novos pedidos genérico
     const handleNewOrder = (event: Event) => {
       console.log('Evento de novo pedido recebido em AdminOrderAlert:', event.type);
-      if (isAdmin()) {
-        handleOrderNotification();
-        
-        // Importante: forçar atualização de pedidos quando eventos são detectados
-        refreshOrders();
-      }
+      handleOrderNotification();
+      refreshOrders();
     };
     
     // Storage event handler com cobertura mais ampla de chaves
     const handleStorageChange = (e: StorageEvent) => {
-      console.log('Evento de armazenamento em AdminOrderAlert:', e.key);
-      
       // Verifica todas as possíveis chaves de broadcast e flag
       const orderKeys = [
         'pizza-palace-new-orders', 'pizza-palace-new-orders-v2',
@@ -82,52 +80,56 @@ const AdminOrderAlert: React.FC = () => {
         'pizza-palace-force-refresh'
       ];
       
-      if (orderKeys.includes(e.key || '') && isAdmin()) {
+      if (orderKeys.includes(e.key || '')) {
         if (e.newValue === 'true' || (e.newValue && e.newValue.includes('new-order'))) {
           console.log('Novo pedido detectado via evento de armazenamento');
           handleOrderNotification();
-          // Força atualização de pedidos
           refreshOrders();
         }
       }
     };
     
-    // Configura monitoramento intensivo de múltiplas fontes para novos pedidos
-    window.addEventListener('new-order-created', handleNewOrder, { capture: true });
-    window.addEventListener('orders-updated', handleNewOrder, { capture: true });
-    window.addEventListener('order-sync-required', handleNewOrder, { capture: true });
-    window.addEventListener('storage', handleStorageChange, { capture: true });
+    // Configura monitoramento de múltiplas fontes para novos pedidos
+    window.addEventListener('new-order-created', handleNewOrder);
+    window.addEventListener('orders-updated', handleNewOrder);
+    window.addEventListener('order-sync-required', handleNewOrder);
+    window.addEventListener('storage', handleStorageChange);
     
-    // Configura polling para melhor compatibilidade entre dispositivos
-    const checkInterval = setInterval(() => {
-      if (isAdmin()) {
-        // Verifica todas as possíveis chaves de flag
-        const newOrdersFlagV2 = localStorage.getItem('pizza-palace-new-orders-v2');
-        const newOrdersFlag = localStorage.getItem('pizza-palace-new-orders');
-        
-        if ((newOrdersFlagV2 === 'true' || newOrdersFlag === 'true') && !showNotification) {
-          console.log('Polling detectou novos pedidos');
-          handleOrderNotification();
-          refreshOrders(); // Força atualização quando polling detecta novos pedidos
-        }
-      }
-    }, 1500); // Verifica a cada 1.5 segundos
-    
-    // Configura um refrescamento periódico mais intensivo para os administradores
-    const refreshInterval = setInterval(() => {
-      if (isAdmin()) {
-        console.log('Intervalo periódico de atualização para administrador');
+    // Configura polling com intervalos mais longos para melhor performance
+    pollTimerRef.current = window.setInterval(() => {
+      // Verifica todas as possíveis chaves de flag
+      const newOrdersFlagV2 = localStorage.getItem('pizza-palace-new-orders-v2');
+      const newOrdersFlag = localStorage.getItem('pizza-palace-new-orders');
+      
+      if ((newOrdersFlagV2 === 'true' || newOrdersFlag === 'true') && !showNotification) {
+        console.log('Polling detectou novos pedidos');
+        handleOrderNotification();
         refreshOrders();
       }
-    }, 10000); // Atualiza a cada 10 segundos para admins
+    }, 3000); // Verifica a cada 3 segundos (aumentado para reduzir carga)
+    
+    // Configura um refrescamento periódico com intervalo maior
+    refreshTimerRef.current = window.setInterval(() => {
+      console.log('Intervalo periódico de atualização para administrador');
+      refreshOrders();
+    }, 30000); // Atualiza a cada 30 segundos (aumentado para reduzir carga)
     
     return () => {
       window.removeEventListener('new-order-created', handleNewOrder);
       window.removeEventListener('orders-updated', handleNewOrder);
       window.removeEventListener('order-sync-required', handleNewOrder);
       window.removeEventListener('storage', handleStorageChange);
-      clearInterval(checkInterval);
-      clearInterval(refreshInterval);
+      
+      // Limpar intervalos ao desmontar
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+      
+      if (refreshTimerRef.current) {
+        clearInterval(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
     };
   }, [isAdmin, showNotification, handleOrderNotification, refreshOrders]);
   
@@ -139,14 +141,17 @@ const AdminOrderAlert: React.FC = () => {
     e.preventDefault();
     e.stopPropagation();
     
+    // Previne múltiplos cliques rápidos
+    if (isRefreshing) return;
+    
     setIsRefreshing(true);
     refreshOrders();
     
-    // Métodos adicionais de sincronização para garantir atualização
+    // Métodos de sincronização otimizados
     try {
       localStorage.setItem('pizza-palace-force-refresh', Date.now().toString());
       
-      // Dispara eventos personalizados para garantir sincronização
+      // Dispara evento personalizado para sincronização
       const syncEvent = new CustomEvent('order-sync-required', { 
         detail: { timestamp: Date.now() } 
       });
@@ -162,8 +167,6 @@ const AdminOrderAlert: React.FC = () => {
     setTimeout(() => {
       setIsRefreshing(false);
     }, 800);
-    
-    console.log('Atualização manual acionada a partir do alerta');
   };
   
   return (
