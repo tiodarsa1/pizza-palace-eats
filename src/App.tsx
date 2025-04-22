@@ -33,7 +33,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 10000, // 10 segundos - reduz a pressão de novas solicitações
-      cacheTime: 300000, // 5 minutos - mantém cache por mais tempo
+      gcTime: 300000, // 5 minutos - mantém cache por mais tempo (substitui cacheTime)
       refetchOnWindowFocus: false, // Previne múltiplas requisições ao retornar à janela
       retry: 1, // Reduz tentativas para diminuir carga
       refetchInterval: false, // Desativa polling automático
