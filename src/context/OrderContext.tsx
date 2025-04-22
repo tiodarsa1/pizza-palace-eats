@@ -341,7 +341,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     
     orderToReuse.items.forEach((item, index) => {
       setTimeout(() => {
-        addToCart(item, false);
+        addToCart(item, item.quantity);
       }, index * 50);
     });
     
