@@ -17,10 +17,11 @@ import NotFound from "./pages/NotFound";
 import AdminOrderAlert from "./components/admin/AdminOrderAlert";
 import React, { useState, useEffect } from "react";
 
-// Create a client
+// Create a client with improved configuration for cross-device consistency
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      gcTime: 5 * 60 * 1000, // 5 minutes
       staleTime: 0, // Consider data as always stale, good for realtime data needs
       refetchOnWindowFocus: true, // Refetch when window regains focus
       retry: 3, // Retry failed requests 3 times
@@ -40,6 +41,25 @@ const App = () => {
       // Store timestamp to detect app loads in other tabs
       sessionStorage.setItem('app-init-time', timestamp);
       localStorage.setItem('pizza-palace-app-reload', timestamp);
+      
+      // Force clear caches for cross-device consistency
+      localStorage.setItem('pizza-palace-force-refresh', timestamp);
+      
+      // Explicitly request a full refresh on app load
+      const forceRefreshEvent = new CustomEvent('order-sync-required', { 
+        detail: { timestamp, source: 'app-init' } 
+      });
+      setTimeout(() => {
+        window.dispatchEvent(forceRefreshEvent);
+        console.log('Dispatched force refresh event on app init');
+      }, 500);
+      
+      // Perform a device identifier check
+      const deviceId = localStorage.getItem('pizza-palace-device-id');
+      if (!deviceId) {
+        const newDeviceId = `device-${Math.random().toString(36).substring(2, 15)}`;
+        localStorage.setItem('pizza-palace-device-id', newDeviceId);
+      }
     } catch (e) {
       console.error('Error clearing caches on app init:', e);
     }

@@ -94,6 +94,14 @@ const AdminOrderAlert: React.FC = () => {
     window.addEventListener('order-sync-required', handleNewOrder, { capture: true });
     window.addEventListener('storage', handleStorageChange, { capture: true });
     
+    // Initial force refresh
+    if (isAdmin()) {
+      setTimeout(() => {
+        refreshOrders();
+        console.log('Initial force refresh in AdminOrderAlert');
+      }, 1000);
+    }
+    
     // Set up polling for better cross-device compatibility
     const checkInterval = setInterval(() => {
       if (isAdmin()) {
@@ -104,6 +112,7 @@ const AdminOrderAlert: React.FC = () => {
         if ((newOrdersFlagV2 === 'true' || newOrdersFlag === 'true') && !showNotification) {
           console.log('Polling detected new orders');
           handleOrderNotification();
+          refreshOrders();
         }
       }
     }, 1500); // Check every 1.5 seconds
@@ -126,6 +135,18 @@ const AdminOrderAlert: React.FC = () => {
     e.stopPropagation();
     
     setIsRefreshing(true);
+    
+    // Try resetting all caches during manual refresh
+    try {
+      localStorage.setItem('pizza-palace-force-refresh', Date.now().toString());
+      
+      // Clear storage flags to ensure fresh state
+      localStorage.removeItem('admin-last-refresh');
+      localStorage.setItem('admin-last-refresh', Date.now().toString());
+    } catch (e) {
+      console.error('Error during cache reset:', e);
+    }
+    
     refreshOrders();
     
     // Show feedback toast
