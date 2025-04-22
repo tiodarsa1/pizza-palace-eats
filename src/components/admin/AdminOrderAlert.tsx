@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { BellRing, RefreshCw } from 'lucide-react';
 import { useOrders } from '@/context/OrderContext';
@@ -8,9 +8,9 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
-// Controle de throttling para eventos de som/vibração para evitar notificações excessivas
+// Sound/vibration event throttling to prevent excessive notifications
 let lastNotificationTime = 0;
-const NOTIFICATION_THROTTLE_MS = 2000; // 2 segundos
+const NOTIFICATION_THROTTLE_MS = 2000; // 2 seconds
 
 const AdminOrderAlert: React.FC = () => {
   const { hasNewOrders, refreshOrders } = useOrders();
@@ -18,118 +18,102 @@ const AdminOrderAlert: React.FC = () => {
   const [showNotification, setShowNotification] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const isMobile = useIsMobile();
-  const refreshTimerRef = useRef<number | null>(null);
-  const pollTimerRef = useRef<number | null>(null);
   
-  // Helper para som de notificação com throttling
+  // Notification sound helper with throttling
   const playNotificationSound = useCallback(() => {
     const now = Date.now();
     if (now - lastNotificationTime < NOTIFICATION_THROTTLE_MS) {
-      console.log('Notificação limitada por throttling');
+      console.log('Notification throttled');
       return;
     }
     
     lastNotificationTime = now;
-    console.log('Tocando som de notificação');
+    console.log('Playing notification sound');
     
-    // Reproduz som de notificação
+    // Play notification sound
     const audio = new Audio('/notification.mp3');
-    audio.volume = isMobile ? 1.0 : 0.5; // Volume mais alto no mobile
-    audio.play().catch(e => console.log('Falha ao tocar som de notificação:', e));
+    audio.volume = isMobile ? 1.0 : 0.5; // Higher volume on mobile
+    audio.play().catch(e => console.log('Failed to play notification sound:', e));
     
-    // Vibra o dispositivo se suportado
+    // Vibrate device if supported
     if (navigator.vibrate) {
       navigator.vibrate([200, 100, 200]);
     }
   }, [isMobile]);
   
-  // Função para lidar com notificações de pedido com debounce
+  // Function to handle order notifications
   const handleOrderNotification = useCallback(() => {
     if (isAdmin()) {
-      console.log('Alerta de administrador: mostrando notificação');
+      console.log('Admin alert: showing notification');
       setShowNotification(true);
       playNotificationSound();
     }
   }, [isAdmin, playNotificationSound]);
   
-  // Verifica hasNewOrders do contexto
+  // Check hasNewOrders from context
   useEffect(() => {
     if (isAdmin() && hasNewOrders) {
-      console.log('Novos pedidos detectados, mostrando notificação');
+      console.log('Has new orders detected, showing notification');
       handleOrderNotification();
     }
   }, [hasNewOrders, isAdmin, handleOrderNotification]);
 
-  // Event listeners aprimorados com monitoramento otimizado
+  // Enhanced event listeners with multiple sources monitoring
   useEffect(() => {
-    if (!isAdmin()) return;
-    
-    // Manipulador de novos pedidos genérico
     const handleNewOrder = (event: Event) => {
-      console.log('Evento de novo pedido recebido em AdminOrderAlert:', event.type);
-      handleOrderNotification();
-      refreshOrders();
+      console.log('New order event received in AdminOrderAlert:', event.type);
+      if (isAdmin()) {
+        handleOrderNotification();
+      }
     };
     
-    // Storage event handler com cobertura mais ampla de chaves
+    // Storage event handler with broader key coverage
     const handleStorageChange = (e: StorageEvent) => {
-      // Verifica todas as possíveis chaves de broadcast e flag
+      console.log('Storage event in AdminOrderAlert:', e.key);
+      
+      // Check all possible broadcast and flag keys
       const orderKeys = [
         'pizza-palace-new-orders', 'pizza-palace-new-orders-v2',
         'pizza-palace-order-broadcast', 'pizza-palace-order-broadcast-v2',
         'pizza-palace-force-refresh'
       ];
       
-      if (orderKeys.includes(e.key || '')) {
+      if (orderKeys.includes(e.key || '') && isAdmin()) {
         if (e.newValue === 'true' || (e.newValue && e.newValue.includes('new-order'))) {
-          console.log('Novo pedido detectado via evento de armazenamento');
+          console.log('New order detected via storage event');
           handleOrderNotification();
+          // Force refresh of orders
           refreshOrders();
         }
       }
     };
     
-    // Configura monitoramento de múltiplas fontes para novos pedidos
-    window.addEventListener('new-order-created', handleNewOrder);
-    window.addEventListener('orders-updated', handleNewOrder);
-    window.addEventListener('order-sync-required', handleNewOrder);
-    window.addEventListener('storage', handleStorageChange);
+    // Set up intensive multi-source monitoring for new orders
+    window.addEventListener('new-order-created', handleNewOrder, { capture: true });
+    window.addEventListener('orders-updated', handleNewOrder, { capture: true });
+    window.addEventListener('order-sync-required', handleNewOrder, { capture: true });
+    window.addEventListener('storage', handleStorageChange, { capture: true });
     
-    // Configura polling com intervalos mais longos para melhor performance
-    pollTimerRef.current = window.setInterval(() => {
-      // Verifica todas as possíveis chaves de flag
-      const newOrdersFlagV2 = localStorage.getItem('pizza-palace-new-orders-v2');
-      const newOrdersFlag = localStorage.getItem('pizza-palace-new-orders');
-      
-      if ((newOrdersFlagV2 === 'true' || newOrdersFlag === 'true') && !showNotification) {
-        console.log('Polling detectou novos pedidos');
-        handleOrderNotification();
-        refreshOrders();
+    // Set up polling for better cross-device compatibility
+    const checkInterval = setInterval(() => {
+      if (isAdmin()) {
+        // Check all possible flag keys
+        const newOrdersFlagV2 = localStorage.getItem('pizza-palace-new-orders-v2');
+        const newOrdersFlag = localStorage.getItem('pizza-palace-new-orders');
+        
+        if ((newOrdersFlagV2 === 'true' || newOrdersFlag === 'true') && !showNotification) {
+          console.log('Polling detected new orders');
+          handleOrderNotification();
+        }
       }
-    }, 3000); // Verifica a cada 3 segundos (aumentado para reduzir carga)
-    
-    // Configura um refrescamento periódico com intervalo maior
-    refreshTimerRef.current = window.setInterval(() => {
-      console.log('Intervalo periódico de atualização para administrador');
-      refreshOrders();
-    }, 30000); // Atualiza a cada 30 segundos (aumentado para reduzir carga)
+    }, 1500); // Check every 1.5 seconds
     
     return () => {
       window.removeEventListener('new-order-created', handleNewOrder);
       window.removeEventListener('orders-updated', handleNewOrder);
       window.removeEventListener('order-sync-required', handleNewOrder);
       window.removeEventListener('storage', handleStorageChange);
-      
-      // Limpar intervalos ao desmontar
-      if (pollTimerRef.current) {
-        clearInterval(pollTimerRef.current);
-        pollTimerRef.current = null;
-      }
-      
-      if (refreshTimerRef.current) {
-        clearInterval(refreshTimerRef.current);
-        refreshTimerRef.current = null;
-      }
+      clearInterval(checkInterval);
     };
   }, [isAdmin, showNotification, handleOrderNotification, refreshOrders]);
   
@@ -141,32 +125,18 @@ const AdminOrderAlert: React.FC = () => {
     e.preventDefault();
     e.stopPropagation();
     
-    // Previne múltiplos cliques rápidos
-    if (isRefreshing) return;
-    
     setIsRefreshing(true);
     refreshOrders();
     
-    // Métodos de sincronização otimizados
-    try {
-      localStorage.setItem('pizza-palace-force-refresh', Date.now().toString());
-      
-      // Dispara evento personalizado para sincronização
-      const syncEvent = new CustomEvent('order-sync-required', { 
-        detail: { timestamp: Date.now() } 
-      });
-      window.dispatchEvent(syncEvent);
-    } catch (e) {
-      console.error('Erro ao disparar sincronização manual:', e);
-    }
-    
-    // Mostra feedback toast
+    // Show feedback toast
     toast.info("Atualizando pedidos...");
     
-    // Redefine estado de atualização após um pequeno atraso
+    // Reset refreshing state after a short delay
     setTimeout(() => {
       setIsRefreshing(false);
     }, 800);
+    
+    console.log('Manual refresh triggered from alert');
   };
   
   return (

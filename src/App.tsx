@@ -7,36 +7,23 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "./context/CartContext";
 import { AuthProvider } from "./context/AuthContext";
 import { OrderProvider } from "./context/OrderContext";
-import { lazy, Suspense } from "react";
-import LoadingIndicator from "./components/common/LoadingIndicator";
+import Index from "./pages/Index";
+import Menu from "./pages/Menu";
+import Cart from "./pages/Cart";
+import Promotions from "./pages/Promotions";
+import OrderHistory from "./pages/OrderHistory";
+import AdminOrders from "./pages/AdminOrders";
+import NotFound from "./pages/NotFound";
 import AdminOrderAlert from "./components/admin/AdminOrderAlert";
 import React, { useState, useEffect } from "react";
 
-// Carregamento lazy de páginas para melhorar performance inicial
-const Index = lazy(() => import("./pages/Index"));
-const Menu = lazy(() => import("./pages/Menu"));
-const Cart = lazy(() => import("./pages/Cart"));
-const Promotions = lazy(() => import("./pages/Promotions"));
-const OrderHistory = lazy(() => import("./pages/OrderHistory"));
-const AdminOrders = lazy(() => import("./pages/AdminOrders"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-
-// Componente de fallback simples enquanto as páginas carregam
-const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center">
-    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-pizza-500" />
-  </div>
-);
-
-// Create a client com configurações otimizadas
+// Create a client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 10000, // 10 segundos - reduz a pressão de novas solicitações
-      gcTime: 300000, // 5 minutos - mantém cache por mais tempo (substitui cacheTime)
-      refetchOnWindowFocus: false, // Previne múltiplas requisições ao retornar à janela
-      retry: 1, // Reduz tentativas para diminuir carga
-      refetchInterval: false, // Desativa polling automático
+      staleTime: 0, // Consider data as always stale, good for realtime data needs
+      refetchOnWindowFocus: true, // Refetch when window regains focus
+      retry: 3, // Retry failed requests 3 times
     },
   },
 });
@@ -46,22 +33,16 @@ const App = () => {
   useEffect(() => {
     console.log("App mounted, clearing old caches");
     
-    // Função para limitar operações pesadas
-    const setupCacheBusting = () => {
-      // Get current timestamp for cache-busting
-      const timestamp = Date.now().toString();
-      
-      try {
-        // Store timestamp to detect app loads in other tabs
-        sessionStorage.setItem('app-init-time', timestamp);
-        localStorage.setItem('pizza-palace-app-reload', timestamp);
-      } catch (e) {
-        console.error('Error clearing caches on app init:', e);
-      }
-    };
+    // Get current timestamp for cache-busting
+    const timestamp = Date.now().toString();
     
-    // Utiliza timeout para dar prioridade à renderização da UI
-    setTimeout(setupCacheBusting, 1000);
+    try {
+      // Store timestamp to detect app loads in other tabs
+      sessionStorage.setItem('app-init-time', timestamp);
+      localStorage.setItem('pizza-palace-app-reload', timestamp);
+    } catch (e) {
+      console.error('Error clearing caches on app init:', e);
+    }
   }, []);
   
   return (
@@ -74,18 +55,15 @@ const App = () => {
                 <Toaster />
                 <Sonner />
                 <BrowserRouter>
-                  <LoadingIndicator />
-                  <Suspense fallback={<PageLoader />}>
-                    <Routes>
-                      <Route path="/" element={<Index />} />
-                      <Route path="/menu" element={<Menu />} />
-                      <Route path="/cart" element={<Cart />} />
-                      <Route path="/promotions" element={<Promotions />} />
-                      <Route path="/orders" element={<OrderHistory />} />
-                      <Route path="/admin" element={<AdminOrders />} />
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
-                  </Suspense>
+                  <Routes>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/menu" element={<Menu />} />
+                    <Route path="/cart" element={<Cart />} />
+                    <Route path="/promotions" element={<Promotions />} />
+                    <Route path="/orders" element={<OrderHistory />} />
+                    <Route path="/admin" element={<AdminOrders />} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
                   <AdminOrderAlert />
                 </BrowserRouter>
               </OrderProvider>

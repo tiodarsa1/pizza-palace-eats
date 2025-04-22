@@ -188,7 +188,7 @@ const AdminOrders = () => {
   
   const updateOrdersList = useCallback(() => {
     try {
-      console.log('Atualizando lista de pedidos com acesso direto ao armazenamento');
+      console.log('Updating orders list with direct storage access');
       
       let ordersFromStorage: Order[] = [];
       let foundOrders = false;
@@ -197,11 +197,11 @@ const AdminOrders = () => {
         const storedOrdersV2 = localStorage.getItem('pizza-palace-orders-v2');
         if (storedOrdersV2) {
           ordersFromStorage = JSON.parse(storedOrdersV2);
-          console.log('Pedidos carregados diretamente do localStorage v2:', ordersFromStorage.length);
+          console.log('Orders loaded directly from localStorage v2:', ordersFromStorage.length);
           foundOrders = true;
         }
       } catch (e) {
-        console.error('Erro ao analisar pedidos do armazenamento v2:', e);
+        console.error('Error parsing orders from v2 storage:', e);
       }
       
       if (!foundOrders) {
@@ -209,13 +209,13 @@ const AdminOrders = () => {
           const storedOrders = localStorage.getItem('pizza-palace-orders');
           if (storedOrders) {
             ordersFromStorage = JSON.parse(storedOrders);
-            console.log('Pedidos carregados diretamente do localStorage legado:', ordersFromStorage.length);
+            console.log('Orders loaded directly from legacy localStorage:', ordersFromStorage.length);
             foundOrders = true;
             
             localStorage.setItem('pizza-palace-orders-v2', storedOrders);
           }
         } catch (e) {
-          console.error('Erro ao analisar pedidos do armazenamento legado:', e);
+          console.error('Error parsing orders from legacy storage:', e);
         }
       }
       
@@ -229,18 +229,18 @@ const AdminOrders = () => {
       }
       
       const allOrders = getAllOrders();
-      console.log('Contagem de pedidos do fallback getAllOrders:', allOrders.length);
+      console.log('Orders count from getAllOrders fallback:', allOrders.length);
       setOrders(allOrders);
       return allOrders.length;
     } catch (error) {
-      console.error('Erro ao atualizar lista de pedidos:', error);
+      console.error('Error updating orders list:', error);
       
       try {
         const contextOrders = getAllOrders();
         setOrders(contextOrders);
         return contextOrders.length;
       } catch (e) {
-        console.error('Erro fatal ao recuperar pedidos:', e);
+        console.error('Fatal error retrieving orders:', e);
         return 0;
       }
     }
@@ -267,7 +267,7 @@ const AdminOrders = () => {
     
     const handleOrderEvent = (event: Event) => {
       const customEvent = event as CustomEvent;
-      console.log('Evento de pedido recebido no painel admin:', event.type, customEvent.detail);
+      console.log('Order event received in admin panel:', event.type, customEvent.detail);
       
       const count = updateOrdersList();
       const eventType = event.type;
@@ -283,7 +283,7 @@ const AdminOrders = () => {
     };
     
     const handleStorageChange = (e: StorageEvent) => {
-      console.log('Armazenamento alterado no painel admin:', e.key);
+      console.log('Storage changed in admin panel:', e.key);
       
       const orderKeys = [
         'pizza-palace-orders', 'pizza-palace-orders-v2',
@@ -294,7 +294,7 @@ const AdminOrders = () => {
       ];
       
       if (orderKeys.includes(e.key || '')) {
-        console.log('Armazenamento relacionado a pedidos alterado, atualizando lista de pedidos');
+        console.log('Order-related storage changed, updating orders list');
         const count = updateOrdersList();
         
         if ((e.key === 'pizza-palace-new-orders' || e.key === 'pizza-palace-new-orders-v2') 
@@ -310,17 +310,17 @@ const AdminOrders = () => {
           try {
             const broadcast = JSON.parse(e.newValue);
             if (broadcast.type === 'new-order') {
-              console.log('Broadcast de novo pedido recebido no painel admin:', broadcast);
+              console.log('New order broadcast received in admin panel:', broadcast);
               updateOrdersList();
               toast.success(`Novo pedido recebido: #${broadcast.orderId.split('-')[1]}`);
             }
           } catch (error) {
-            console.error('Erro ao analisar dados de broadcast:', error);
+            console.error('Error parsing broadcast data:', error);
           }
         }
         
         if (e.key === 'pizza-palace-force-refresh' && e.newValue) {
-          console.log('Solicitação de atualização forçada detectada');
+          console.log('Force refresh request detected');
           updateOrdersList();
         }
       }
@@ -344,10 +344,10 @@ const AdminOrders = () => {
       window.removeEventListener('storage', handleStorageChange);
       clearInterval(pollingInterval);
     };
-  }, [isAuthenticated, isAdmin, navigate, hasNewOrders, clearNewOrdersFlag, updateOrdersList, isMobile, clearNewOrdersFlag, refreshOrders]);
+  }, [isAuthenticated, isAdmin, navigate, hasNewOrders, clearNewOrdersFlag, updateOrdersList, isMobile]);
   
   useEffect(() => {
-    console.log('Pedidos atuais no painel admin:', orders.length);
+    console.log('Current orders in admin panel:', orders.length);
   }, [orders]);
   
   const filteredOrders = filter === 'all' 
@@ -364,7 +364,7 @@ const AdminOrders = () => {
   };
   
   const handleManualRefresh = () => {
-    console.log('Atualização manual solicitada');
+    console.log('Manual refresh requested');
     setIsRefreshing(true);
     
     try {
@@ -373,19 +373,12 @@ const AdminOrders = () => {
       
       refreshOrders();
       
-      localStorage.setItem('pizza-palace-force-refresh', Date.now().toString());
-      
-      const syncEvent = new CustomEvent('order-sync-required', { 
-        detail: { timestamp: Date.now() } 
-      });
-      window.dispatchEvent(syncEvent);
-      
       setTimeout(() => {
         const count = updateOrdersList();
         toast.info(`Lista de pedidos atualizada. Total: ${count} pedidos`);
       }, 200);
     } catch (e) {
-      console.error('Erro durante atualização manual:', e);
+      console.error('Error during manual refresh:', e);
       updateOrdersList();
       toast.info('Lista de pedidos atualizada');
     } finally {

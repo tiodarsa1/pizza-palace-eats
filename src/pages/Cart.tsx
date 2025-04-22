@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -46,12 +45,12 @@ const Cart = () => {
 
     setIsSubmitting(true);
     try {
-      console.log('Criando pedido para usuário:', user);
+      console.log('Creating order for user:', user);
       
-      // Múltiplas tentativas para confiabilidade
+      // Multiple attempts for reliability
       let orderId;
       try {
-        // Primeira tentativa
+        // First attempt
         orderId = await createOrder(
           cart, 
           deliveryData, 
@@ -62,10 +61,10 @@ const Cart = () => {
           getCartTotal()
         );
         
-        console.log('Pedido criado com sucesso, ID:', orderId);
+        console.log('Order created successfully with ID:', orderId);
       } catch (error) {
-        console.error('Primeira tentativa falhou, tentando novamente:', error);
-        // Segunda tentativa com pequeno atraso
+        console.error('First attempt failed, retrying order creation:', error);
+        // Second attempt with slight delay
         await new Promise(resolve => setTimeout(resolve, 200));
         
         orderId = await createOrder(
@@ -79,29 +78,29 @@ const Cart = () => {
         );
       }
       
-      // Sincronização adicional direta entre navegadores com múltiplos métodos
+      // Additional direct cross-browser sync with multiple methods
       try {
-        // 1. Força outros navegadores/abas a atualizar pedidos imediatamente
+        // 1. Force other tabs/browsers to refresh their orders immediately
         localStorage.setItem('pizza-palace-force-refresh', Date.now().toString());
         
-        // 2. Cria eventos adicionais para disparar atualizações
+        // 2. Create additional events to trigger refreshes
         ['order-sync-required', 'orders-updated', 'new-order-created'].forEach(eventType => {
           try {
             const syncEvent = new CustomEvent(eventType, {
               detail: { timestamp: Date.now(), orderId }
             });
             window.dispatchEvent(syncEvent);
-            console.log(`Evento ${eventType} disparado para novo pedido`);
+            console.log(`Dispatched ${eventType} event for new order`);
           } catch (e) {
-            console.error(`Erro ao disparar evento ${eventType}:`, e);
+            console.error(`Error dispatching ${eventType} event:`, e);
           }
         });
         
-        // 3. Garante que as novas e antigas chaves de flag estão definidas
+        // 3. Ensure both old and new flag keys are set
         localStorage.setItem('pizza-palace-new-orders', 'true');
         localStorage.setItem('pizza-palace-new-orders-v2', 'true');
         
-        // 4. Garante que as novas e antigas chaves de broadcast têm valores
+        // 4. Ensure both old and new broadcast keys have values
         const broadcastData = JSON.stringify({
           type: 'new-order',
           orderId,
@@ -112,39 +111,27 @@ const Cart = () => {
         localStorage.setItem('pizza-palace-order-broadcast', broadcastData);
         localStorage.setItem('pizza-palace-order-broadcast-v2', broadcastData);
         
-        console.log('Sincronização entre navegadores completa');
+        console.log('Cross-browser synchronization complete');
       } catch (error) {
-        console.error('Erro ao enviar eventos adicionais de sincronização:', error);
+        console.error('Error sending additional sync events:', error);
       }
       
-      // Agenda uma sincronização adicional atrasada para maior confiabilidade
+      // Schedule a delayed additional sync for reliability
       setTimeout(() => {
         try {
           localStorage.setItem('pizza-palace-force-refresh', Date.now().toString());
-          console.log('Disparado gatilho de atualização forçada atrasado');
+          console.log('Sent delayed force refresh trigger');
         } catch (e) {
-          console.error('Erro ao enviar atualização forçada atrasada:', e);
+          console.error('Error sending delayed force refresh:', e);
         }
       }, 1000);
       
-      // Adiciona um segundo timer ainda mais longo para garantir sincronização
-      setTimeout(() => {
-        try {
-          localStorage.setItem('pizza-palace-force-refresh', Date.now().toString());
-          localStorage.setItem('pizza-palace-new-orders', 'true');
-          localStorage.setItem('pizza-palace-new-orders-v2', 'true');
-          console.log('Sincronização de segurança final enviada');
-        } catch (e) {
-          console.error('Erro na sincronização final:', e);
-        }
-      }, 3000);
-      
       setIsPaymentDialogOpen(false);
       toast.success('Pedido realizado com sucesso!');
-      clearCart(false); // Passa false para suprimir o toast
+      clearCart(false); // Pass false to suppress the toast
       navigate('/orders');
     } catch (error) {
-      console.error('Erro ao criar pedido:', error);
+      console.error('Error creating order:', error);
       toast.error('Erro ao finalizar pedido. Tente novamente.');
     } finally {
       setIsSubmitting(false);
