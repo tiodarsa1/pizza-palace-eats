@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { CartItem, useCart } from './CartContext';
@@ -57,7 +58,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   
   const saveOrdersToStorage = useCallback((updatedOrders: Order[]) => {
     try {
-      console.log('Saving orders to storage, count:', updatedOrders.length);
+      console.log('Salvando pedidos no armazenamento, quantidade:', updatedOrders.length);
       const ordersString = JSON.stringify(updatedOrders);
       localStorage.setItem(ORDERS_STORAGE_KEY, ordersString);
       
@@ -65,7 +66,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       
       localStorage.setItem(LAST_SYNC_KEY, Date.now().toString());
     } catch (error) {
-      console.error('Error saving orders to storage:', error);
+      console.error('Erro ao salvar pedidos no armazenamento:', error);
     }
   }, []);
 
@@ -74,13 +75,13 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const savedOrders = localStorage.getItem(ORDERS_STORAGE_KEY);
       if (savedOrders) {
         const parsedOrders = JSON.parse(savedOrders);
-        console.log('Orders loaded from localStorage:', parsedOrders.length);
+        console.log('Pedidos carregados do localStorage:', parsedOrders.length);
         setOrders(parsedOrders);
       } else {
         const oldOrders = localStorage.getItem('pizza-palace-orders');
         if (oldOrders) {
           const parsedOldOrders = JSON.parse(oldOrders);
-          console.log('Migrating from old storage key, orders:', parsedOldOrders.length);
+          console.log('Migrando da chave de armazenamento antiga, pedidos:', parsedOldOrders.length);
           setOrders(parsedOldOrders);
           localStorage.setItem(ORDERS_STORAGE_KEY, oldOrders);
         }
@@ -89,18 +90,18 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const newOrdersFlag = localStorage.getItem(NEW_ORDERS_KEY) || localStorage.getItem('pizza-palace-new-orders');
       setHasNewOrders(newOrdersFlag === 'true');
     } catch (error) {
-      console.error('Error loading orders from localStorage:', error);
+      console.error('Erro ao carregar pedidos do localStorage:', error);
     }
   }, []);
 
   const refreshOrders = useCallback(() => {
-    console.log('Manually refreshing orders with high priority');
+    console.log('Atualizando pedidos manualmente com alta prioridade');
     
     try {
       const sessionData = sessionStorage.getItem(ORDERS_STORAGE_KEY);
       if (sessionData) {
         const parsedOrders = JSON.parse(sessionData);
-        console.log('Using session storage data first, orders:', parsedOrders.length);
+        console.log('Usando dados da sessão primeiro, pedidos:', parsedOrders.length);
         setOrders(parsedOrders);
       }
       
@@ -108,7 +109,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       
       broadcastOrderUpdate();
     } catch (e) {
-      console.error('Error during high-priority refresh:', e);
+      console.error('Erro durante atualização de alta prioridade:', e);
       loadOrders();
     }
   }, [loadOrders]);
@@ -117,12 +118,14 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       const timestamp = Date.now();
       
+      // Emite um evento personalizado para notificar outras abas
       const customEvent = new CustomEvent('orders-updated', { 
         detail: { timestamp } 
       });
       window.dispatchEvent(customEvent);
-      console.log('Custom event dispatched for order updates, timestamp:', timestamp);
+      console.log('Evento personalizado disparado para atualizações de pedidos, timestamp:', timestamp);
       
+      // Usa localStorage para compartilhar informações entre abas/navegadores
       localStorage.removeItem(BROADCAST_KEY);
       localStorage.setItem(BROADCAST_KEY, JSON.stringify({
         type: 'orders-updated',
@@ -130,15 +133,21 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         source: 'broadcast'
       }));
       
+      // Force a full sync across browsers - sistema mais confiável
       localStorage.setItem(LAST_SYNC_KEY, timestamp.toString());
-      console.log('Order update broadcast completed');
+      
+      // Garante que todos os sistemas de sincronização são atualizados
+      localStorage.setItem('pizza-palace-force-refresh', timestamp.toString());
+      localStorage.setItem('pizza-palace-last-sync', timestamp.toString());
+      
+      console.log('Broadcast de atualização de pedidos concluído');
     } catch (e) {
-      console.error('Error broadcasting order update:', e);
+      console.error('Erro ao fazer broadcast de atualização de pedido:', e);
     }
   }, []);
 
   useEffect(() => {
-    console.log('OrderContext initializing');
+    console.log('OrderContext inicializando');
     
     loadOrders();
     
@@ -150,7 +159,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const lastLocalSync = parseInt(sessionStorage.getItem('last-local-sync') || '0', 10);
           
           if (lastSyncTime > lastLocalSync) {
-            console.log('Detected newer data via timestamp, reloading');
+            console.log('Detectados dados mais recentes via timestamp, recarregando');
             loadOrders();
             sessionStorage.setItem('last-local-sync', lastSyncTime.toString());
           }
@@ -158,36 +167,36 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           loadOrders();
         }
       } catch (e) {
-        console.error('Error during polling interval:', e);
+        console.error('Erro durante intervalo de polling:', e);
       }
     }, 1500);
     
     const handleCustomEvent = (event: Event) => {
       const customEvent = event as CustomEvent;
-      console.log('Custom order event received:', customEvent.type, customEvent.detail);
+      console.log('Evento personalizado de pedido recebido:', customEvent.type, customEvent.detail);
       
       if (customEvent.type === 'orders-updated' || customEvent.type === 'new-order-created') {
-        console.log('Reloading orders due to custom event');
+        console.log('Recarregando pedidos devido a evento personalizado');
         loadOrders();
       }
     };
     
     const handleStorageChange = (e: StorageEvent) => {
-      console.log('Storage event:', e.key);
+      console.log('Evento de armazenamento:', e.key);
       
       if (e.key === ORDERS_STORAGE_KEY || e.key === NEW_ORDERS_KEY || 
           e.key === LAST_SYNC_KEY || e.key === BROADCAST_KEY ||
           e.key === 'pizza-palace-orders' || e.key === 'pizza-palace-new-orders' ||
           e.key === 'pizza-palace-last-sync' || e.key === 'pizza-palace-order-broadcast' ||
           e.key === 'pizza-palace-force-refresh') {
-        console.log('Order-related storage changed, reloading orders');
+        console.log('Armazenamento relacionado a pedidos alterado, recarregando pedidos');
         loadOrders();
         
         try {
           const currentTime = Date.now().toString();
           sessionStorage.setItem('last-local-sync', currentTime);
         } catch (error) {
-          console.error('Error updating last sync timestamp:', error);
+          console.error('Erro ao atualizar timestamp da última sincronização:', error);
         }
       }
     };
@@ -197,6 +206,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     window.addEventListener('order-sync-required', handleCustomEvent, { capture: true });
     window.addEventListener('storage', handleStorageChange, { capture: true });
     
+    // Força uma atualização inicial para garantir dados sincronizados
     setTimeout(refreshOrders, 500);
     
     return () => {
@@ -210,7 +220,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     if (orders.length > 0) {
-      console.log('Orders changed, saving to storage:', orders.length);
+      console.log('Pedidos alterados, salvando no armazenamento:', orders.length);
       saveOrdersToStorage(orders);
     }
   }, [orders, saveOrdersToStorage]);
@@ -222,7 +232,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     total: number
   ): Promise<string> => {
     if (!user) {
-      throw new Error('User must be logged in to create an order');
+      throw new Error('Usuário deve estar logado para criar um pedido');
     }
 
     const timestamp = Date.now();
@@ -245,7 +255,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         currentOrders = JSON.parse(storedOrders);
       }
     } catch (e) {
-      console.error('Error reading current orders from storage:', e);
+      console.error('Erro ao ler pedidos atuais do armazenamento:', e);
       currentOrders = [...orders];
     }
     
@@ -254,16 +264,20 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setOrders(updatedOrders);
     saveOrdersToStorage(updatedOrders);
     
+    // Marca que existem novos pedidos para os administradores
     localStorage.setItem(NEW_ORDERS_KEY, 'true');
+    localStorage.setItem('pizza-palace-new-orders', 'true');
     setHasNewOrders(true);
     
     try {
+      // Método 1: Eventos personalizados para notificar outras abas no mesmo navegador
       const customEvent = new CustomEvent('new-order-created', { 
         detail: { order: newOrder, timestamp } 
       });
       window.dispatchEvent(customEvent);
-      console.log('Custom event dispatched for new order:', newOrder.id);
+      console.log('Evento personalizado disparado para novo pedido:', newOrder.id);
       
+      // Método 2: Usando localStorage para comunicação entre navegadores/abas
       localStorage.removeItem(BROADCAST_KEY);
       localStorage.setItem(BROADCAST_KEY, JSON.stringify({
         type: 'new-order',
@@ -272,9 +286,11 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         source: 'order-creation'
       }));
       
+      // Método 3: Forçar sincronização completa
       localStorage.setItem(LAST_SYNC_KEY, timestamp.toString());
       localStorage.setItem('pizza-palace-force-refresh', timestamp.toString());
       
+      // Compatibilidade com versões antigas
       localStorage.setItem('pizza-palace-new-orders', 'true');
       localStorage.setItem('pizza-palace-order-broadcast', JSON.stringify({
         type: 'new-order',
@@ -282,21 +298,25 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         timestamp
       }));
       
-      console.log('New order broadcast completed with all methods');
+      console.log('Broadcast de novo pedido concluído com todos os métodos');
       
+      // Adiciona sincronização atrasada para maior confiabilidade 
       setTimeout(() => {
         try {
           const syncEvent = new CustomEvent('order-sync-required', { 
             detail: { timestamp: Date.now() } 
           });
           window.dispatchEvent(syncEvent);
-          console.log('Delayed sync event dispatched');
+          console.log('Evento de sincronização atrasada disparado');
+          
+          // Forçar todos os navegadores a recarregar (método adicional)
+          localStorage.setItem('pizza-palace-force-refresh', Date.now().toString());
         } catch (e) {
-          console.error('Error dispatching delayed sync event:', e);
+          console.error('Erro ao disparar evento de sincronização atrasada:', e);
         }
       }, 500);
     } catch (e) {
-      console.error('Error broadcasting new order:', e);
+      console.error('Erro ao fazer broadcast de novo pedido:', e);
     }
     
     return newOrder.id;
@@ -307,6 +327,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [orders]);
 
   const getAllOrders = useCallback((): Order[] => {
+    // Tenta obter os pedidos mais recentes do localStorage antes de usar o estado
     let savedOrders = localStorage.getItem(ORDERS_STORAGE_KEY);
     let allOrders = orders;
     
@@ -315,21 +336,23 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const parsedOrders = JSON.parse(savedOrders);
         if (Array.isArray(parsedOrders) && parsedOrders.length > 0) {
           allOrders = parsedOrders;
+          // Se houver diferença entre o localStorage e o estado, atualiza o estado
           if (JSON.stringify(parsedOrders) !== JSON.stringify(orders)) {
-            console.log('Found different orders in localStorage, updating state');
+            console.log('Encontrados pedidos diferentes no localStorage, atualizando estado');
             setOrders(parsedOrders);
           }
         }
       } catch (error) {
-        console.error('Error parsing orders from localStorage:', error);
+        console.error('Erro ao analisar pedidos do localStorage:', error);
       }
     }
     
+    // Retorna os pedidos ordenados por data (mais recentes primeiro)
     return [...allOrders].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [orders]);
 
   const reorder = useCallback((orderId: string) => {
-    console.log('Reordering items from order:', orderId);
+    console.log('Repetindo itens do pedido:', orderId);
     
     const orderToReuse = orders.find(order => order.id === orderId);
     if (!orderToReuse) {
@@ -351,6 +374,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [orders, clearCart, addToCart]);
 
   const updateOrderStatus = (orderId: string, status: OrderStatus) => {
+    // Busca os pedidos mais recentes antes de atualizar
     let currentOrders: Order[] = [];
     try {
       const storedOrders = localStorage.getItem(ORDERS_STORAGE_KEY);
@@ -360,7 +384,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         currentOrders = [...orders];
       }
     } catch (e) {
-      console.error('Error reading current orders during status update:', e);
+      console.error('Erro ao ler pedidos atuais durante atualização de status:', e);
       currentOrders = [...orders];
     }
     
@@ -371,6 +395,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setOrders(updatedOrders);
     saveOrdersToStorage(updatedOrders);
     
+    // Garante que todas as instâncias são atualizadas
     broadcastOrderUpdate();
     
     const order = currentOrders.find(o => o.id === orderId);
