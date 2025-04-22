@@ -1,13 +1,14 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { LogIn } from 'lucide-react';
+import { LogIn, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const loginFormSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -22,6 +23,7 @@ interface LoginFormProps {
 
 const LoginForm = ({ onSuccess }: LoginFormProps) => {
   const { login, isLoading } = useAuth();
+  const [loginError, setLoginError] = useState<string | null>(null);
   
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginFormSchema),
@@ -32,17 +34,26 @@ const LoginForm = ({ onSuccess }: LoginFormProps) => {
   });
 
   const onSubmit = async (data: LoginFormData) => {
+    setLoginError(null);
     try {
       await login(data.email, data.password);
       if (onSuccess) onSuccess();
     } catch (error) {
-      // Error is already handled in the login function
+      console.error('Falha no login:', error);
+      setLoginError('Email ou senha incorretos. Por favor, verifique suas credenciais.');
     }
   };
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {loginError && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{loginError}</AlertDescription>
+          </Alert>
+        )}
+        
         <FormField
           control={form.control}
           name="email"
@@ -50,7 +61,15 @@ const LoginForm = ({ onSuccess }: LoginFormProps) => {
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
-                <Input placeholder="seu@email.com" type="email" {...field} />
+                <Input 
+                  placeholder="seu@email.com" 
+                  type="email" 
+                  {...field} 
+                  onChange={(e) => {
+                    setLoginError(null);
+                    field.onChange(e);
+                  }}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -64,7 +83,15 @@ const LoginForm = ({ onSuccess }: LoginFormProps) => {
             <FormItem>
               <FormLabel>Senha</FormLabel>
               <FormControl>
-                <Input placeholder="******" type="password" {...field} />
+                <Input 
+                  placeholder="******" 
+                  type="password" 
+                  {...field}
+                  onChange={(e) => {
+                    setLoginError(null);
+                    field.onChange(e);
+                  }}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

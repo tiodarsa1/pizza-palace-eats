@@ -38,7 +38,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const users = getUsers();
     const adminExists = Object.values(users).some(
-      (u: any) => u.email === ADMIN_EMAIL && u.role === 'admin'
+      (u: any) => u.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && u.role === 'admin'
     );
     
     if (!adminExists) {
@@ -60,7 +60,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const loadUser = () => {
       const savedUser = localStorage.getItem(CURRENT_USER_KEY);
       if (savedUser) {
-        setUser(JSON.parse(savedUser));
+        try {
+          setUser(JSON.parse(savedUser));
+        } catch (error) {
+          console.error('Erro ao carregar usuário do localStorage:', error);
+          localStorage.removeItem(CURRENT_USER_KEY);
+        }
       }
     };
     
@@ -68,12 +73,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const getUsers = (): Record<string, { id: string; name: string; email: string; password: string; role?: 'admin' | 'user' }> => {
-    const users = localStorage.getItem(USERS_STORAGE_KEY);
-    return users ? JSON.parse(users) : {};
+    try {
+      const users = localStorage.getItem(USERS_STORAGE_KEY);
+      return users ? JSON.parse(users) : {};
+    } catch (error) {
+      console.error('Erro ao obter usuários do localStorage:', error);
+      return {};
+    }
   };
 
   const saveUsers = (users: Record<string, any>) => {
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+    try {
+      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+    } catch (error) {
+      console.error('Erro ao salvar usuários no localStorage:', error);
+      toast.error('Erro ao salvar dados de usuário. Verifique seu armazenamento local.');
+    }
+  };
+
+  const normalizeEmail = (email: string): string => {
+    return email.trim().toLowerCase();
   };
 
   const login = async (email: string, password: string) => {
@@ -82,9 +101,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await new Promise(resolve => setTimeout(resolve, 500));
       
+      const normalizedEmail = normalizeEmail(email);
       const users = getUsers();
+      
+      // Improved comparison - case insensitive for email
       const foundUser = Object.values(users).find(
-        (u: any) => u.email === email && u.password === password
+        (u: any) => normalizeEmail(u.email) === normalizedEmail && u.password === password
       );
       
       if (foundUser) {
@@ -101,10 +123,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(typedUser));
         toast.success('Login realizado com sucesso!');
       } else {
-        toast.error('Email ou senha inválidos');
-        throw new Error('Invalid credentials');
+        console.log('Tentativa de login falhou:', { email: normalizedEmail });
+        toast.error('Email ou senha incorretos');
+        throw new Error('Credenciais inválidas');
       }
     } catch (error) {
+      console.error('Erro durante login:', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -116,20 +140,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await new Promise(resolve => setTimeout(resolve, 500));
       
+      const normalizedEmail = normalizeEmail(email);
       const users = getUsers();
       
       // Improved email check with case insensitivity
       const emailExists = Object.values(users).some(
-        (u: any) => u.email.toLowerCase() === email.toLowerCase()
+        (u: any) => normalizeEmail(u.email) === normalizedEmail
       );
       
       if (emailExists) {
         toast.error('Este email já está em uso');
-        throw new Error('Email already exists');
+        throw new Error('Email já existe');
       }
       
       const id = `user-${Date.now()}`;
-      const newUser = { id, name, email, password, role: 'user' as 'user' };  // Explicitly cast as 'user'
+      const newUser = { 
+        id, 
+        name, 
+        email: normalizedEmail, // Store email in normalized form
+        password, 
+        role: 'user' as 'user'  // Explicitly cast as 'user'
+      };
       
       // Save to "database"
       users[id] = newUser;
@@ -142,6 +173,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       toast.success('Cadastro realizado com sucesso!');
     } catch (error) {
+      console.error('Erro durante cadastro:', error);
       throw error;
     } finally {
       setIsLoading(false);
