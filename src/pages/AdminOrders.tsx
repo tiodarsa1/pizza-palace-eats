@@ -186,63 +186,21 @@ const AdminOrders = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const isMobile = useIsMobile();
   
+  // Função melhorada para atualizar lista de pedidos
   const updateOrdersList = useCallback(() => {
     try {
-      console.log('Updating orders list with direct storage access');
+      console.log('Updating orders list with improved sync');
       
-      let ordersFromStorage: Order[] = [];
-      let foundOrders = false;
-      
-      try {
-        const storedOrdersV2 = localStorage.getItem('pizza-palace-orders-v2');
-        if (storedOrdersV2) {
-          ordersFromStorage = JSON.parse(storedOrdersV2);
-          console.log('Orders loaded directly from localStorage v2:', ordersFromStorage.length);
-          foundOrders = true;
-        }
-      } catch (e) {
-        console.error('Error parsing orders from v2 storage:', e);
-      }
-      
-      if (!foundOrders) {
-        try {
-          const storedOrders = localStorage.getItem('pizza-palace-orders');
-          if (storedOrders) {
-            ordersFromStorage = JSON.parse(storedOrders);
-            console.log('Orders loaded directly from legacy localStorage:', ordersFromStorage.length);
-            foundOrders = true;
-            
-            localStorage.setItem('pizza-palace-orders-v2', storedOrders);
-          }
-        } catch (e) {
-          console.error('Error parsing orders from legacy storage:', e);
-        }
-      }
-      
-      if (foundOrders && ordersFromStorage.length > 0) {
-        ordersFromStorage.sort((a, b) => 
-          new Date(b.date).getTime() - new Date(a.date).getTime()
-        );
-        
-        setOrders(ordersFromStorage);
-        return ordersFromStorage.length;
-      }
-      
+      // Usar getAllOrders que já implementa a lógica de busca em múltiplos storages
       const allOrders = getAllOrders();
-      console.log('Orders count from getAllOrders fallback:', allOrders.length);
+      console.log('Orders retrieved:', allOrders.length);
+      
       setOrders(allOrders);
       return allOrders.length;
     } catch (error) {
       console.error('Error updating orders list:', error);
-      
-      try {
-        const contextOrders = getAllOrders();
-        setOrders(contextOrders);
-        return contextOrders.length;
-      } catch (e) {
-        console.error('Fatal error retrieving orders:', e);
-        return 0;
-      }
+      setOrders([]);
+      return 0;
     }
   }, [getAllOrders]);
   
@@ -263,79 +221,63 @@ const AdminOrders = () => {
       clearNewOrdersFlag();
     }
     
+    // Carregamento inicial
     updateOrdersList();
     
+    // Event handlers para sincronização em tempo real
     const handleOrderEvent = (event: Event) => {
       const customEvent = event as CustomEvent;
       console.log('Order event received in admin panel:', event.type, customEvent.detail);
       
       const count = updateOrdersList();
-      const eventType = event.type;
       
-      if (eventType === 'new-order-created') {
+      if (event.type === 'new-order-created') {
         toast.success(`Novo pedido recebido! Total: ${count}`);
         if (isMobile && navigator.vibrate) {
           navigator.vibrate([100, 50, 100]);
         }
-      } else {
-        toast.info(`Pedidos atualizados. Total: ${count}`);
+      } else if (event.type === 'orders-updated') {
+        console.log('Orders updated, refreshing list');
       }
     };
     
     const handleStorageChange = (e: StorageEvent) => {
-      console.log('Storage changed in admin panel:', e.key);
-      
       const orderKeys = [
-        'pizza-palace-orders', 'pizza-palace-orders-v2',
-        'pizza-palace-new-orders', 'pizza-palace-new-orders-v2',
-        'pizza-palace-last-sync', 'pizza-palace-last-sync-v2',
-        'pizza-palace-order-broadcast', 'pizza-palace-order-broadcast-v2',
-        'pizza-palace-force-refresh'
+        'pizza-palace-orders-v3', 'pizza-palace-orders-v2', 'pizza-palace-orders',
+        'pizza-palace-new-orders-v3', 'pizza-palace-new-orders-v2', 'pizza-palace-new-orders',
+        'pizza-palace-sync-v3', 'pizza-palace-last-sync-v2', 'pizza-palace-last-sync',
+        'pizza-palace-order-broadcast-v2', 'pizza-palace-order-broadcast'
       ];
       
       if (orderKeys.includes(e.key || '')) {
-        console.log('Order-related storage changed, updating orders list');
-        const count = updateOrdersList();
+        console.log('Storage changed in admin panel:', e.key);
         
-        if ((e.key === 'pizza-palace-new-orders' || e.key === 'pizza-palace-new-orders-v2') 
-            && e.newValue === 'true') {
-          toast.success(`Novo pedido detectado! Total: ${count}`);
-          if (isMobile && navigator.vibrate) {
-            navigator.vibrate([100, 50, 100]);
-          }
-        }
-        
-        if ((e.key === 'pizza-palace-order-broadcast' || e.key === 'pizza-palace-order-broadcast-v2') 
-            && e.newValue) {
-          try {
-            const broadcast = JSON.parse(e.newValue);
-            if (broadcast.type === 'new-order') {
-              console.log('New order broadcast received in admin panel:', broadcast);
-              updateOrdersList();
-              toast.success(`Novo pedido recebido: #${broadcast.orderId.split('-')[1]}`);
+        setTimeout(() => {
+          const count = updateOrdersList();
+          
+          if (e.key?.includes('new-orders') && e.newValue === 'true') {
+            toast.success(`Novo pedido detectado! Total: ${count}`);
+            if (isMobile && navigator.vibrate) {
+              navigator.vibrate([100, 50, 100]);
             }
-          } catch (error) {
-            console.error('Error parsing broadcast data:', error);
           }
-        }
-        
-        if (e.key === 'pizza-palace-force-refresh' && e.newValue) {
-          console.log('Force refresh request detected');
-          updateOrdersList();
-        }
+        }, 100);
       }
     };
     
-    window.addEventListener('new-order-created', handleOrderEvent, { capture: true });
-    window.addEventListener('orders-updated', handleOrderEvent, { capture: true });
-    window.addEventListener('order-sync-required', handleOrderEvent, { capture: true });
-    window.addEventListener('storage', handleStorageChange, { capture: true });
+    // Registrar event listeners
+    window.addEventListener('new-order-created', handleOrderEvent);
+    window.addEventListener('orders-updated', handleOrderEvent);
+    window.addEventListener('order-sync-required', handleOrderEvent);
+    window.addEventListener('storage', handleStorageChange);
     
-    const pollingInterval = setInterval(updateOrdersList, isMobile ? 1000 : 2000);
+    // Polling para garantir sincronização
+    const pollingInterval = setInterval(updateOrdersList, 2000);
     
-    setTimeout(updateOrdersList, 300);
+    // Múltiplas tentativas de carregamento inicial
+    setTimeout(updateOrdersList, 100);
+    setTimeout(updateOrdersList, 500);
     setTimeout(updateOrdersList, 1000);
-    setTimeout(updateOrdersList, 3000);
     
     return () => {
       window.removeEventListener('new-order-created', handleOrderEvent);
@@ -368,9 +310,6 @@ const AdminOrders = () => {
     setIsRefreshing(true);
     
     try {
-      localStorage.removeItem('admin-last-refresh');
-      localStorage.setItem('admin-last-refresh', Date.now().toString());
-      
       refreshOrders();
       
       setTimeout(() => {

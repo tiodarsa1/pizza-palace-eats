@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { CartItem, useCart } from './CartContext';
@@ -44,176 +45,180 @@ interface OrderContextType {
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
-const ORDERS_STORAGE_KEY = 'pizza-palace-orders-v2';
-const NEW_ORDERS_KEY = 'pizza-palace-new-orders-v2';
-const LAST_SYNC_KEY = 'pizza-palace-last-sync-v2';
-const BROADCAST_KEY = 'pizza-palace-order-broadcast-v2';
+const ORDERS_STORAGE_KEY = 'pizza-palace-orders-v3';
+const NEW_ORDERS_KEY = 'pizza-palace-new-orders-v3';
+const SYNC_KEY = 'pizza-palace-sync-v3';
 
 export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [hasNewOrders, setHasNewOrders] = useState<boolean>(false);
+  const [lastSyncTime, setLastSyncTime] = useState<number>(0);
   const { addToCart, clearCart } = useCart();
   const { user } = useAuth();
   
-  const saveOrdersToStorage = useCallback((updatedOrders: Order[]) => {
-    try {
-      console.log('Saving orders to storage, count:', updatedOrders.length);
-      const ordersString = JSON.stringify(updatedOrders);
-      localStorage.setItem(ORDERS_STORAGE_KEY, ordersString);
-      
-      sessionStorage.setItem(ORDERS_STORAGE_KEY, ordersString);
-      
-      localStorage.setItem(LAST_SYNC_KEY, Date.now().toString());
-    } catch (error) {
-      console.error('Error saving orders to storage:', error);
-    }
-  }, []);
-
-  const loadOrders = useCallback(() => {
-    try {
-      const savedOrders = localStorage.getItem(ORDERS_STORAGE_KEY);
-      if (savedOrders) {
-        const parsedOrders = JSON.parse(savedOrders);
-        console.log('Orders loaded from localStorage:', parsedOrders.length);
-        setOrders(parsedOrders);
-      } else {
-        const oldOrders = localStorage.getItem('pizza-palace-orders');
-        if (oldOrders) {
-          const parsedOldOrders = JSON.parse(oldOrders);
-          console.log('Migrating from old storage key, orders:', parsedOldOrders.length);
-          setOrders(parsedOldOrders);
-          localStorage.setItem(ORDERS_STORAGE_KEY, oldOrders);
-        }
-      }
-      
-      const newOrdersFlag = localStorage.getItem(NEW_ORDERS_KEY) || localStorage.getItem('pizza-palace-new-orders');
-      setHasNewOrders(newOrdersFlag === 'true');
-    } catch (error) {
-      console.error('Error loading orders from localStorage:', error);
-    }
-  }, []);
-
-  const refreshOrders = useCallback(() => {
-    console.log('Manually refreshing orders with high priority');
-    
-    try {
-      const sessionData = sessionStorage.getItem(ORDERS_STORAGE_KEY);
-      if (sessionData) {
-        const parsedOrders = JSON.parse(sessionData);
-        console.log('Using session storage data first, orders:', parsedOrders.length);
-        setOrders(parsedOrders);
-      }
-      
-      loadOrders();
-      
-      broadcastOrderUpdate();
-    } catch (e) {
-      console.error('Error during high-priority refresh:', e);
-      loadOrders();
-    }
-  }, [loadOrders]);
-
-  const broadcastOrderUpdate = useCallback(() => {
+  // Função para salvar pedidos com sincronização cruzada
+  const saveOrdersWithSync = useCallback((updatedOrders: Order[]) => {
     try {
       const timestamp = Date.now();
+      const ordersString = JSON.stringify(updatedOrders);
       
-      const customEvent = new CustomEvent('orders-updated', { 
-        detail: { timestamp } 
-      });
-      window.dispatchEvent(customEvent);
-      console.log('Custom event dispatched for order updates, timestamp:', timestamp);
+      // Salvar em múltiplos storages para máxima compatibilidade
+      localStorage.setItem(ORDERS_STORAGE_KEY, ordersString);
+      localStorage.setItem('pizza-palace-orders-v2', ordersString);
+      localStorage.setItem('pizza-palace-orders', ordersString);
       
-      localStorage.removeItem(BROADCAST_KEY);
-      localStorage.setItem(BROADCAST_KEY, JSON.stringify({
-        type: 'orders-updated',
-        timestamp,
-        source: 'broadcast'
-      }));
+      // Atualizar timestamp de sincronização
+      localStorage.setItem(SYNC_KEY, timestamp.toString());
+      localStorage.setItem('pizza-palace-last-sync-v2', timestamp.toString());
+      localStorage.setItem('pizza-palace-last-sync', timestamp.toString());
       
-      localStorage.setItem(LAST_SYNC_KEY, timestamp.toString());
-      console.log('Order update broadcast completed');
-    } catch (e) {
-      console.error('Error broadcasting order update:', e);
+      setLastSyncTime(timestamp);
+      
+      console.log('Orders saved with cross-device sync:', updatedOrders.length);
+    } catch (error) {
+      console.error('Error saving orders with sync:', error);
     }
   }, []);
 
-  useEffect(() => {
-    console.log('OrderContext initializing');
-    
-    loadOrders();
-    
-    const pollingInterval = setInterval(() => {
-      try {
-        const lastSync = localStorage.getItem(LAST_SYNC_KEY);
-        if (lastSync) {
-          const lastSyncTime = parseInt(lastSync, 10);
-          const lastLocalSync = parseInt(sessionStorage.getItem('last-local-sync') || '0', 10);
-          
-          if (lastSyncTime > lastLocalSync) {
-            console.log('Detected newer data via timestamp, reloading');
-            loadOrders();
-            sessionStorage.setItem('last-local-sync', lastSyncTime.toString());
+  // Função para carregar pedidos de qualquer storage disponível
+  const loadOrdersFromAnyStorage = useCallback(() => {
+    try {
+      const storageKeys = [ORDERS_STORAGE_KEY, 'pizza-palace-orders-v2', 'pizza-palace-orders'];
+      
+      for (const key of storageKeys) {
+        const savedOrders = localStorage.getItem(key);
+        if (savedOrders) {
+          const parsedOrders = JSON.parse(savedOrders);
+          if (Array.isArray(parsedOrders) && parsedOrders.length >= 0) {
+            console.log(`Orders loaded from ${key}:`, parsedOrders.length);
+            setOrders(parsedOrders);
+            
+            // Se carregou de um storage antigo, migra para o novo
+            if (key !== ORDERS_STORAGE_KEY) {
+              localStorage.setItem(ORDERS_STORAGE_KEY, savedOrders);
+            }
+            
+            return parsedOrders;
           }
-        } else {
-          loadOrders();
         }
-      } catch (e) {
-        console.error('Error during polling interval:', e);
       }
-    }, 1500);
-    
-    const handleCustomEvent = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      console.log('Custom order event received:', customEvent.type, customEvent.detail);
       
-      if (customEvent.type === 'orders-updated' || customEvent.type === 'new-order-created') {
-        console.log('Reloading orders due to custom event');
-        loadOrders();
+      console.log('No orders found in any storage');
+      setOrders([]);
+      return [];
+    } catch (error) {
+      console.error('Error loading orders from storage:', error);
+      setOrders([]);
+      return [];
+    }
+  }, []);
+
+  // Função para verificar sincronização entre dispositivos
+  const checkForUpdates = useCallback(() => {
+    try {
+      const syncKeys = [SYNC_KEY, 'pizza-palace-last-sync-v2', 'pizza-palace-last-sync'];
+      let latestSync = 0;
+      
+      for (const key of syncKeys) {
+        const syncTime = localStorage.getItem(key);
+        if (syncTime) {
+          const time = parseInt(syncTime, 10);
+          if (time > latestSync) {
+            latestSync = time;
+          }
+        }
       }
-    };
+      
+      if (latestSync > lastSyncTime) {
+        console.log('Newer data detected, refreshing orders');
+        loadOrdersFromAnyStorage();
+        setLastSyncTime(latestSync);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error checking for updates:', error);
+      return false;
+    }
+  }, [lastSyncTime, loadOrdersFromAnyStorage]);
+
+  const refreshOrders = useCallback(() => {
+    console.log('Manual refresh triggered');
+    loadOrdersFromAnyStorage();
     
+    // Verificar flags de novos pedidos
+    const newOrdersFlags = [NEW_ORDERS_KEY, 'pizza-palace-new-orders-v2', 'pizza-palace-new-orders'];
+    for (const flag of newOrdersFlags) {
+      if (localStorage.getItem(flag) === 'true') {
+        setHasNewOrders(true);
+        break;
+      }
+    }
+  }, [loadOrdersFromAnyStorage]);
+
+  // Inicialização e polling
+  useEffect(() => {
+    console.log('OrderContext initializing with cross-device sync');
+    
+    // Carregamento inicial
+    loadOrdersFromAnyStorage();
+    
+    // Verificar flags de novos pedidos
+    const newOrdersFlags = [NEW_ORDERS_KEY, 'pizza-palace-new-orders-v2', 'pizza-palace-new-orders'];
+    for (const flag of newOrdersFlags) {
+      if (localStorage.getItem(flag) === 'true') {
+        setHasNewOrders(true);
+        break;
+      }
+    }
+    
+    // Polling mais agressivo para sincronização
+    const pollingInterval = setInterval(() => {
+      checkForUpdates();
+    }, 1000); // Verifica a cada 1 segundo
+    
+    // Event listeners para mudanças de storage
     const handleStorageChange = (e: StorageEvent) => {
-      console.log('Storage event:', e.key);
+      const orderKeys = [
+        ORDERS_STORAGE_KEY, 'pizza-palace-orders-v2', 'pizza-palace-orders',
+        NEW_ORDERS_KEY, 'pizza-palace-new-orders-v2', 'pizza-palace-new-orders',
+        SYNC_KEY, 'pizza-palace-last-sync-v2', 'pizza-palace-last-sync',
+        'pizza-palace-order-broadcast-v2', 'pizza-palace-order-broadcast'
+      ];
       
-      if (e.key === ORDERS_STORAGE_KEY || e.key === NEW_ORDERS_KEY || 
-          e.key === LAST_SYNC_KEY || e.key === BROADCAST_KEY ||
-          e.key === 'pizza-palace-orders' || e.key === 'pizza-palace-new-orders' ||
-          e.key === 'pizza-palace-last-sync' || e.key === 'pizza-palace-order-broadcast' ||
-          e.key === 'pizza-palace-force-refresh') {
-        console.log('Order-related storage changed, reloading orders');
-        loadOrders();
-        
-        try {
-          const currentTime = Date.now().toString();
-          sessionStorage.setItem('last-local-sync', currentTime);
-        } catch (error) {
-          console.error('Error updating last sync timestamp:', error);
-        }
+      if (orderKeys.includes(e.key || '')) {
+        console.log('Storage changed, refreshing:', e.key);
+        setTimeout(() => {
+          loadOrdersFromAnyStorage();
+          
+          // Verificar novos pedidos
+          if (e.key?.includes('new-orders') && e.newValue === 'true') {
+            setHasNewOrders(true);
+          }
+        }, 100);
       }
     };
     
-    window.addEventListener('orders-updated', handleCustomEvent, { capture: true });
-    window.addEventListener('new-order-created', handleCustomEvent, { capture: true });
-    window.addEventListener('order-sync-required', handleCustomEvent, { capture: true });
-    window.addEventListener('storage', handleStorageChange, { capture: true });
+    // Event listeners customizados
+    const handleCustomEvents = () => {
+      console.log('Custom order event received, refreshing');
+      setTimeout(loadOrdersFromAnyStorage, 100);
+    };
     
-    setTimeout(refreshOrders, 500);
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('new-order-created', handleCustomEvents);
+    window.addEventListener('orders-updated', handleCustomEvents);
+    window.addEventListener('order-sync-required', handleCustomEvents);
     
     return () => {
       clearInterval(pollingInterval);
-      window.removeEventListener('orders-updated', handleCustomEvent);
-      window.removeEventListener('new-order-created', handleCustomEvent);
-      window.removeEventListener('order-sync-required', handleCustomEvent);
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('new-order-created', handleCustomEvents);
+      window.removeEventListener('orders-updated', handleCustomEvents);
+      window.removeEventListener('order-sync-required', handleCustomEvents);
     };
-  }, [loadOrders, refreshOrders]);
-
-  useEffect(() => {
-    if (orders.length > 0) {
-      console.log('Orders changed, saving to storage:', orders.length);
-      saveOrdersToStorage(orders);
-    }
-  }, [orders, saveOrdersToStorage]);
+  }, [loadOrdersFromAnyStorage, checkForUpdates]);
 
   const createOrder = async (
     items: CartItem[], 
@@ -238,63 +243,36 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       userName: user.name
     };
 
-    let currentOrders: Order[] = [];
-    try {
-      const storedOrders = localStorage.getItem(ORDERS_STORAGE_KEY);
-      if (storedOrders) {
-        currentOrders = JSON.parse(storedOrders);
-      }
-    } catch (e) {
-      console.error('Error reading current orders from storage:', e);
-      currentOrders = [...orders];
-    }
-    
+    // Carregar pedidos atuais de qualquer storage
+    const currentOrders = loadOrdersFromAnyStorage();
     const updatedOrders = [...currentOrders, newOrder];
     
+    // Salvar com sincronização
     setOrders(updatedOrders);
-    saveOrdersToStorage(updatedOrders);
+    saveOrdersWithSync(updatedOrders);
     
-    localStorage.setItem(NEW_ORDERS_KEY, 'true');
+    // Definir flags de novos pedidos em todos os storages
+    const newOrderFlags = [NEW_ORDERS_KEY, 'pizza-palace-new-orders-v2', 'pizza-palace-new-orders'];
+    newOrderFlags.forEach(flag => localStorage.setItem(flag, 'true'));
     setHasNewOrders(true);
     
+    // Broadcast para outros dispositivos/abas
     try {
-      const customEvent = new CustomEvent('new-order-created', { 
-        detail: { order: newOrder, timestamp } 
-      });
-      window.dispatchEvent(customEvent);
-      console.log('Custom event dispatched for new order:', newOrder.id);
-      
-      localStorage.removeItem(BROADCAST_KEY);
-      localStorage.setItem(BROADCAST_KEY, JSON.stringify({
+      const broadcastData = {
         type: 'new-order',
         orderId: newOrder.id,
         timestamp,
-        source: 'order-creation'
-      }));
+        orders: updatedOrders
+      };
       
-      localStorage.setItem(LAST_SYNC_KEY, timestamp.toString());
-      localStorage.setItem('pizza-palace-force-refresh', timestamp.toString());
+      localStorage.setItem('pizza-palace-order-broadcast-v2', JSON.stringify(broadcastData));
+      localStorage.setItem('pizza-palace-order-broadcast', JSON.stringify(broadcastData));
       
-      localStorage.setItem('pizza-palace-new-orders', 'true');
-      localStorage.setItem('pizza-palace-order-broadcast', JSON.stringify({
-        type: 'new-order',
-        orderId: newOrder.id,
-        timestamp
-      }));
+      // Eventos customizados
+      window.dispatchEvent(new CustomEvent('new-order-created', { detail: broadcastData }));
+      window.dispatchEvent(new CustomEvent('orders-updated', { detail: broadcastData }));
       
-      console.log('New order broadcast completed with all methods');
-      
-      setTimeout(() => {
-        try {
-          const syncEvent = new CustomEvent('order-sync-required', { 
-            detail: { timestamp: Date.now() } 
-          });
-          window.dispatchEvent(syncEvent);
-          console.log('Delayed sync event dispatched');
-        } catch (e) {
-          console.error('Error dispatching delayed sync event:', e);
-        }
-      }, 500);
+      console.log('Order created and broadcasted:', newOrder.id);
     } catch (e) {
       console.error('Error broadcasting new order:', e);
     }
@@ -307,26 +285,10 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [orders]);
 
   const getAllOrders = useCallback((): Order[] => {
-    let savedOrders = localStorage.getItem(ORDERS_STORAGE_KEY);
-    let allOrders = orders;
-    
-    if (savedOrders) {
-      try {
-        const parsedOrders = JSON.parse(savedOrders);
-        if (Array.isArray(parsedOrders) && parsedOrders.length > 0) {
-          allOrders = parsedOrders;
-          if (JSON.stringify(parsedOrders) !== JSON.stringify(orders)) {
-            console.log('Found different orders in localStorage, updating state');
-            setOrders(parsedOrders);
-          }
-        }
-      } catch (error) {
-        console.error('Error parsing orders from localStorage:', error);
-      }
-    }
-    
-    return [...allOrders].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [orders]);
+    // Sempre retorna a versão mais atualizada dos pedidos
+    const currentOrders = loadOrdersFromAnyStorage();
+    return [...currentOrders].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [loadOrdersFromAnyStorage]);
 
   const reorder = useCallback((orderId: string) => {
     console.log('Reordering items from order:', orderId);
@@ -351,27 +313,29 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [orders, clearCart, addToCart]);
 
   const updateOrderStatus = (orderId: string, status: OrderStatus) => {
-    let currentOrders: Order[] = [];
-    try {
-      const storedOrders = localStorage.getItem(ORDERS_STORAGE_KEY);
-      if (storedOrders) {
-        currentOrders = JSON.parse(storedOrders);
-      } else {
-        currentOrders = [...orders];
-      }
-    } catch (e) {
-      console.error('Error reading current orders during status update:', e);
-      currentOrders = [...orders];
-    }
-    
+    const currentOrders = loadOrdersFromAnyStorage();
     const updatedOrders = currentOrders.map(order => 
       order.id === orderId ? { ...order, status } : order
     );
     
     setOrders(updatedOrders);
-    saveOrdersToStorage(updatedOrders);
+    saveOrdersWithSync(updatedOrders);
     
-    broadcastOrderUpdate();
+    // Broadcast da atualização
+    try {
+      const broadcastData = {
+        type: 'order-status-updated',
+        orderId,
+        status,
+        timestamp: Date.now(),
+        orders: updatedOrders
+      };
+      
+      localStorage.setItem('pizza-palace-order-broadcast-v2', JSON.stringify(broadcastData));
+      window.dispatchEvent(new CustomEvent('orders-updated', { detail: broadcastData }));
+    } catch (e) {
+      console.error('Error broadcasting status update:', e);
+    }
     
     const order = currentOrders.find(o => o.id === orderId);
     if (order) {
@@ -400,8 +364,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const clearNewOrdersFlag = () => {
     setHasNewOrders(false);
-    localStorage.setItem(NEW_ORDERS_KEY, 'false');
-    localStorage.setItem('pizza-palace-new-orders', 'false');
+    const flags = [NEW_ORDERS_KEY, 'pizza-palace-new-orders-v2', 'pizza-palace-new-orders'];
+    flags.forEach(flag => localStorage.setItem(flag, 'false'));
   };
 
   return (
