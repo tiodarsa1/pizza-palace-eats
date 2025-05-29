@@ -10,13 +10,15 @@ import { toast } from 'sonner';
 
 // Sound/vibration event throttling to prevent excessive notifications
 let lastNotificationTime = 0;
-const NOTIFICATION_THROTTLE_MS = 2000; // 2 seconds
+const NOTIFICATION_THROTTLE_MS = 5000; // 5 seconds
+const NOTIFICATION_DISPLAY_TIME = 10000; // 10 seconds
 
 const AdminOrderAlert: React.FC = () => {
   const { hasNewOrders, refreshOrders } = useOrders();
   const { isAdmin } = useAuth();
   const [showNotification, setShowNotification] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastOrderCount, setLastOrderCount] = useState(0);
   const isMobile = useIsMobile();
   
   // Notification sound helper with throttling
@@ -41,90 +43,101 @@ const AdminOrderAlert: React.FC = () => {
     }
   }, [isMobile]);
   
-  // Function to handle order notifications
+  // Function to handle order notifications with smarter logic
   const handleOrderNotification = useCallback(() => {
     if (isAdmin()) {
       console.log('Admin alert: showing notification');
       setShowNotification(true);
       playNotificationSound();
+      
+      // Auto-hide notification after display time
+      setTimeout(() => {
+        setShowNotification(false);
+      }, NOTIFICATION_DISPLAY_TIME);
     }
   }, [isAdmin, playNotificationSound]);
   
-  // Check hasNewOrders from context
+  // Monitor order count changes instead of just flags
   useEffect(() => {
-    if (isAdmin() && hasNewOrders) {
-      console.log('Has new orders detected, showing notification');
-      handleOrderNotification();
+    if (isAdmin()) {
+      try {
+        const storedOrders = localStorage.getItem('pizza-palace-orders-v2') || localStorage.getItem('pizza-palace-orders');
+        if (storedOrders) {
+          const orders = JSON.parse(storedOrders);
+          const currentCount = orders.length;
+          
+          // Only show notification if order count actually increased
+          if (lastOrderCount > 0 && currentCount > lastOrderCount) {
+            console.log('Order count increased, showing notification');
+            handleOrderNotification();
+          }
+          
+          setLastOrderCount(currentCount);
+        }
+      } catch (e) {
+        console.error('Error checking order count:', e);
+      }
     }
-  }, [hasNewOrders, isAdmin, handleOrderNotification]);
+  }, [isAdmin, handleOrderNotification, lastOrderCount]);
 
-  // Enhanced event listeners with multiple sources monitoring
+  // Enhanced event listeners with smarter detection
   useEffect(() => {
     const handleNewOrder = (event: Event) => {
       console.log('New order event received in AdminOrderAlert:', event.type);
-      if (isAdmin()) {
+      if (isAdmin() && !showNotification) { // Only show if not already showing
         handleOrderNotification();
       }
     };
     
-    // Storage event handler with broader key coverage
+    // Storage event handler with order count checking
     const handleStorageChange = (e: StorageEvent) => {
       console.log('Storage event in AdminOrderAlert:', e.key);
       
       // Check all possible broadcast and flag keys
       const orderKeys = [
-        'pizza-palace-new-orders', 'pizza-palace-new-orders-v2',
-        'pizza-palace-order-broadcast', 'pizza-palace-order-broadcast-v2',
-        'pizza-palace-force-refresh'
+        'pizza-palace-orders', 'pizza-palace-orders-v2',
+        'pizza-palace-order-broadcast', 'pizza-palace-order-broadcast-v2'
       ];
       
-      if (orderKeys.includes(e.key || '') && isAdmin()) {
-        if (e.newValue === 'true' || (e.newValue && e.newValue.includes('new-order'))) {
-          console.log('New order detected via storage event');
-          handleOrderNotification();
-          // Force refresh of orders
-          refreshOrders();
+      if (orderKeys.includes(e.key || '') && isAdmin() && !showNotification) {
+        // Only react to actual new orders, not just any storage change
+        if (e.key?.includes('broadcast') && e.newValue) {
+          try {
+            const broadcast = JSON.parse(e.newValue);
+            if (broadcast.type === 'new-order') {
+              console.log('New order detected via storage event');
+              handleOrderNotification();
+              refreshOrders();
+            }
+          } catch (error) {
+            console.log('Error parsing broadcast:', error);
+          }
         }
       }
     };
     
-    // Set up intensive multi-source monitoring for new orders
+    // Set up event listeners
     window.addEventListener('new-order-created', handleNewOrder, { capture: true });
-    window.addEventListener('orders-updated', handleNewOrder, { capture: true });
-    window.addEventListener('order-sync-required', handleNewOrder, { capture: true });
     window.addEventListener('storage', handleStorageChange, { capture: true });
     
-    // Initial force refresh
-    if (isAdmin()) {
-      setTimeout(() => {
-        refreshOrders();
-        console.log('Initial force refresh in AdminOrderAlert');
-      }, 1000);
-    }
-    
-    // Set up polling for better cross-device compatibility
-    const checkInterval = setInterval(() => {
-      if (isAdmin()) {
-        // Check all possible flag keys
-        const newOrdersFlagV2 = localStorage.getItem('pizza-palace-new-orders-v2');
-        const newOrdersFlag = localStorage.getItem('pizza-palace-new-orders');
-        
-        if ((newOrdersFlagV2 === 'true' || newOrdersFlag === 'true') && !showNotification) {
-          console.log('Polling detected new orders');
-          handleOrderNotification();
-          refreshOrders();
+    // Initial order count setup
+    if (isAdmin() && lastOrderCount === 0) {
+      try {
+        const storedOrders = localStorage.getItem('pizza-palace-orders-v2') || localStorage.getItem('pizza-palace-orders');
+        if (storedOrders) {
+          const orders = JSON.parse(storedOrders);
+          setLastOrderCount(orders.length);
         }
+      } catch (e) {
+        console.error('Error setting initial order count:', e);
       }
-    }, 1500); // Check every 1.5 seconds
+    }
     
     return () => {
       window.removeEventListener('new-order-created', handleNewOrder);
-      window.removeEventListener('orders-updated', handleNewOrder);
-      window.removeEventListener('order-sync-required', handleNewOrder);
       window.removeEventListener('storage', handleStorageChange);
-      clearInterval(checkInterval);
     };
-  }, [isAdmin, showNotification, handleOrderNotification, refreshOrders]);
+  }, [isAdmin, showNotification, handleOrderNotification, refreshOrders, lastOrderCount]);
   
   if (!isAdmin()) {
     return null;
@@ -135,17 +148,6 @@ const AdminOrderAlert: React.FC = () => {
     e.stopPropagation();
     
     setIsRefreshing(true);
-    
-    // Try resetting all caches during manual refresh
-    try {
-      localStorage.setItem('pizza-palace-force-refresh', Date.now().toString());
-      
-      // Clear storage flags to ensure fresh state
-      localStorage.removeItem('admin-last-refresh');
-      localStorage.setItem('admin-last-refresh', Date.now().toString());
-    } catch (e) {
-      console.error('Error during cache reset:', e);
-    }
     
     refreshOrders();
     
@@ -158,6 +160,13 @@ const AdminOrderAlert: React.FC = () => {
     }, 800);
     
     console.log('Manual refresh triggered from alert');
+  };
+  
+  const handleNotificationClick = () => {
+    setShowNotification(false);
+    // Clear the new orders flag when user acknowledges
+    localStorage.setItem('pizza-palace-new-orders-v2', 'false');
+    localStorage.setItem('pizza-palace-new-orders', 'false');
   };
   
   return (
@@ -177,7 +186,7 @@ const AdminOrderAlert: React.FC = () => {
         <Link 
           to="/admin" 
           className="bg-red-600 text-white px-4 py-3 rounded-full shadow-lg flex items-center gap-2 animate-bounce"
-          onClick={() => setShowNotification(false)}
+          onClick={handleNotificationClick}
         >
           <BellRing className="h-5 w-5" />
           <span className="font-medium">Novos pedidos!</span>
