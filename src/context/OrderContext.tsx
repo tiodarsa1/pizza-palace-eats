@@ -151,16 +151,16 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const orderData = {
         user_id: user.id,
         user_name: user.name,
-        items: items,
-        delivery: delivery,
-        payment: payment,
+        items: items as any, // Cast to Json type
+        delivery: delivery as any, // Cast to Json type
+        payment: payment as any, // Cast to Json type
         total: total,
         status: 'pending' as OrderStatus
       };
 
       const { data, error } = await supabase
         .from('orders')
-        .insert([orderData])
+        .insert(orderData)
         .select()
         .single();
 
