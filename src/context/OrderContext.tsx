@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { CartItem, useCart } from './CartContext';
@@ -46,6 +45,32 @@ interface OrderContextType {
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
+
+// Função para validar se um string é um UUID válido
+const isValidUUID = (str: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+};
+
+// Função para gerar um UUID válido a partir de um string
+const generateValidUUID = (input: string): string => {
+  // Se já é um UUID válido, retorna como está
+  if (isValidUUID(input)) {
+    return input;
+  }
+  
+  // Cria um UUID válido usando crypto.randomUUID() ou fallback
+  try {
+    return crypto.randomUUID();
+  } catch {
+    // Fallback para browsers que não suportam crypto.randomUUID()
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+};
 
 export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -168,8 +193,12 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         throw new Error('Método de pagamento não selecionado');
       }
 
+      // Garantir que o user_id seja um UUID válido
+      const validUserId = generateValidUUID(user.id);
+      console.log('Original user ID:', user.id, 'Valid UUID:', validUserId);
+
       const orderData = {
-        user_id: user.id,
+        user_id: validUserId,
         user_name: user.name || 'Usuário',
         items: JSON.parse(JSON.stringify(items)), // Garantir serialização correta
         delivery: JSON.parse(JSON.stringify(delivery)), // Garantir serialização correta
