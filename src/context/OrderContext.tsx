@@ -142,21 +142,43 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     total: number
   ): Promise<string> => {
     if (!user) {
+      console.error('User not authenticated');
       throw new Error('User must be logged in to create an order');
     }
 
     try {
-      console.log('Creating order in database...');
-      
+      console.log('Creating order with data:', {
+        user: user,
+        items: items,
+        delivery: delivery,
+        payment: payment,
+        total: total
+      });
+
+      // Validar dados antes de enviar
+      if (!items || items.length === 0) {
+        throw new Error('Carrinho vazio');
+      }
+
+      if (!delivery.street || !delivery.number || !delivery.neighborhood || !delivery.phone) {
+        throw new Error('Informações de entrega incompletas');
+      }
+
+      if (!payment.method) {
+        throw new Error('Método de pagamento não selecionado');
+      }
+
       const orderData = {
         user_id: user.id,
-        user_name: user.name,
-        items: items as any, // Cast to Json type
-        delivery: delivery as any, // Cast to Json type
-        payment: payment as any, // Cast to Json type
-        total: total,
-        status: 'pending' as OrderStatus
+        user_name: user.name || 'Usuário',
+        items: JSON.parse(JSON.stringify(items)), // Garantir serialização correta
+        delivery: JSON.parse(JSON.stringify(delivery)), // Garantir serialização correta
+        payment: JSON.parse(JSON.stringify(payment)), // Garantir serialização correta
+        total: Number(total),
+        status: 'pending'
       };
+
+      console.log('Sending order data to Supabase:', orderData);
 
       const { data, error } = await supabase
         .from('orders')
@@ -165,17 +187,38 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         .single();
 
       if (error) {
-        console.error('Error creating order:', error);
-        throw error;
+        console.error('Supabase error details:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        console.error('Error details:', error.details);
+        throw new Error(`Erro do banco de dados: ${error.message}`);
       }
 
-      console.log('Order created successfully:', data.id);
+      if (!data) {
+        throw new Error('Nenhum dado retornado após criação do pedido');
+      }
+
+      console.log('Order created successfully:', data);
       toast.success('Pedido criado com sucesso!');
       
       return data.id;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating order:', error);
-      toast.error('Erro ao criar pedido');
+      
+      // Melhorar mensagens de erro para o usuário
+      let errorMessage = 'Erro ao criar pedido. Tente novamente.';
+      
+      if (error.message?.includes('violates row-level security')) {
+        errorMessage = 'Erro de permissão. Faça login novamente.';
+      } else if (error.message?.includes('invalid input syntax')) {
+        errorMessage = 'Dados inválidos. Verifique as informações.';
+      } else if (error.message?.includes('connection')) {
+        errorMessage = 'Erro de conexão. Verifique sua internet.';
+      } else if (error.message && error.message.length < 100) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
       throw error;
     }
   };
