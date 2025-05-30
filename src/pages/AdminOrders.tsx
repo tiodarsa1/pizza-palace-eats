@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Bell, BellRing, Check, Truck, Package, RefreshCw } from 'lucide-react';
+import { Bell, BellRing, Check, Truck, Package, RefreshCw, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -56,10 +56,11 @@ const getPaymentMethodLabel = (method: string) => {
   }
 };
 
-const OrderDetailModal = ({ order, onClose, onUpdateStatus }: { 
+const OrderDetailModal = ({ order, onClose, onUpdateStatus, onDeleteOrder }: { 
   order: Order | null, 
   onClose: () => void,
-  onUpdateStatus: (orderId: string, status: OrderStatus) => void
+  onUpdateStatus: (orderId: string, status: OrderStatus) => void,
+  onDeleteOrder: (orderId: string) => void
 }) => {
   if (!order) return null;
   
@@ -151,9 +152,21 @@ const OrderDetailModal = ({ order, onClose, onUpdateStatus }: {
           </div>
           
           <div className="mt-6 flex justify-end gap-4">
+            <Button 
+              variant="destructive"
+              onClick={() => {
+                onDeleteOrder(order.id);
+                onClose();
+              }}
+              className="gap-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              Deletar Pedido
+            </Button>
+            
             {order.status !== 'completed' && order.status !== 'cancelled' && (
               <Button 
-                variant="destructive"
+                variant="outline"
                 onClick={() => onUpdateStatus(order.id, 'cancelled')}
               >
                 Cancelar Pedido
@@ -179,7 +192,7 @@ const OrderDetailModal = ({ order, onClose, onUpdateStatus }: {
 const AdminOrders = () => {
   const navigate = useNavigate();
   const { isAuthenticated, isAdmin } = useAuth();
-  const { getAllOrders, updateOrderStatus, hasNewOrders, clearNewOrdersFlag, refreshOrders } = useOrders();
+  const { getAllOrders, updateOrderStatus, deleteOrder, hasNewOrders, clearNewOrdersFlag, refreshOrders } = useOrders();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [filter, setFilter] = useState<OrderStatus | 'all'>('all');
   const [orders, setOrders] = useState<Order[]>([]);
@@ -303,6 +316,15 @@ const AdminOrders = () => {
     setOrders(prev => 
       prev.map(order => order.id === orderId ? { ...order, status } : order)
     );
+  };
+  
+  const handleDeleteOrder = async (orderId: string) => {
+    try {
+      await deleteOrder(orderId);
+      setOrders(prev => prev.filter(order => order.id !== orderId));
+    } catch (error) {
+      console.error('Error deleting order:', error);
+    }
   };
   
   const handleManualRefresh = () => {
@@ -438,19 +460,30 @@ const AdminOrders = () => {
                         key={order.id}
                         className={order.status === 'pending' ? 'bg-yellow-50' : ''}
                       >
-                        <TableCell className="font-medium">#{order.id.split('-')[1]}</TableCell>
+                        <TableCell className="font-medium">#{order.id.substring(0, 8)}</TableCell>
                         <TableCell>{order.userName || 'Cliente'}</TableCell>
                         <TableCell>{formatDate(order.date)}</TableCell>
                         <TableCell>{getStatusBadge(order.status)}</TableCell>
                         <TableCell>R$ {order.total.toFixed(2)}</TableCell>
                         <TableCell className="text-right">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => setSelectedOrder(order)}
-                          >
-                            Detalhes
-                          </Button>
+                          <div className="flex gap-2 justify-end">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setSelectedOrder(order)}
+                            >
+                              Detalhes
+                            </Button>
+                            <Button 
+                              variant="destructive" 
+                              size="sm"
+                              onClick={() => handleDeleteOrder(order.id)}
+                              className="gap-1"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              Deletar
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -467,6 +500,7 @@ const AdminOrders = () => {
           order={selectedOrder} 
           onClose={() => setSelectedOrder(null)}
           onUpdateStatus={handleUpdateStatus}
+          onDeleteOrder={handleDeleteOrder}
         />
       )}
     </Layout>
