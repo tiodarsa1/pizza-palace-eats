@@ -98,6 +98,13 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       console.log('Loading orders from database...');
       
+      // Verificar se o cliente Supabase está configurado
+      if (!supabase.supabaseUrl || !supabase.supabaseKey) {
+        console.error('Supabase client not properly configured');
+        toast.error('Erro de configuração. Verifique a conexão com o banco de dados.');
+        return;
+      }
+
       const { data, error } = await supabase
         .from('orders')
         .select('*')
@@ -105,6 +112,15 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       
       if (error) {
         console.error('Error loading orders:', error);
+        
+        // Tratar diferentes tipos de erro
+        if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+          toast.error('Erro de conexão. Verifique sua internet e tente novamente.');
+        } else if (error.message?.includes('JWT')) {
+          toast.error('Sessão expirada. Faça login novamente.');
+        } else {
+          toast.error('Erro ao carregar pedidos. Tente novamente.');
+        }
         return;
       }
       
@@ -114,6 +130,13 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setOrders(formattedOrders);
     } catch (error) {
       console.error('Error loading orders from database:', error);
+      
+      // Tratar erros de rede e outros erros não capturados
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        toast.error('Erro de conexão com o servidor. Verifique sua internet.');
+      } else {
+        toast.error('Erro inesperado ao carregar pedidos.');
+      }
     }
   }, []);
 
