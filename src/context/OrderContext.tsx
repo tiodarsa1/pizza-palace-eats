@@ -98,17 +98,24 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       console.log('Loading orders from database...');
       
+      // Test basic connectivity first
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
       const { data, error } = await supabase
         .from('orders')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .abortSignal(controller.signal);
+      
+      clearTimeout(timeoutId);
       
       if (error) {
         console.error('Error loading orders:', error);
         
         // Tratar diferentes tipos de erro
         if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
-          toast.error('Erro de conexão. Verifique sua internet e tente novamente.');
+          toast.error('Não foi possível conectar ao servidor. Verifique sua conexão com a internet ou tente novamente mais tarde.');
         } else if (error.message?.includes('JWT')) {
           toast.error('Sessão expirada. Faça login novamente.');
         } else {
@@ -126,10 +133,15 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       
       // Tratar erros de rede e outros erros não capturados
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        toast.error('Erro de conexão com o servidor. Verifique sua internet.');
+        toast.error('Servidor indisponível. Verifique se o projeto Supabase está ativo e sua conexão com a internet.');
+      } else if (error instanceof Error && error.name === 'AbortError') {
+        toast.error('Conexão muito lenta. Verifique sua internet e tente novamente.');
       } else {
         toast.error('Erro inesperado ao carregar pedidos.');
       }
+      
+      // Set empty orders array to prevent UI issues
+      setOrders([]);
     }
   }, []);
 
