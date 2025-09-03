@@ -98,13 +98,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       console.log('Loading orders from database...');
       
-      // Verificar se o cliente Supabase está configurado
-      if (!supabase.supabaseUrl || !supabase.supabaseKey) {
-        console.error('Supabase client not properly configured');
-        toast.error('Erro de configuração. Verifique a conexão com o banco de dados.');
-        return;
-      }
-
       const { data, error } = await supabase
         .from('orders')
         .select('*')
